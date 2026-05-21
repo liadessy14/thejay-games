@@ -96,5 +96,3 @@ By submitting (including uploading, committing, or contributing in any form) to 
 
 All contributors acknowledge and grant permission for their submitted content to be used and hosted on The Jay Network Games without limitation, including for public display and distribution.
 
-
-```
