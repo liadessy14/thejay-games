@@ -115,5 +115,4 @@ By uploading, committing, or submitting any content, you acknowledge that:
 
 ---
 
-# 📌 End of Terms
-```
+--- End of Terms ---
