@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sword Chase: Chaos</title>
+    <style>
+        body { 
+            margin: 0; background-color: #050508; color: #00f0ff; font-family: 'Consolas', 'Courier New', Courier, monospace; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            min-height: 100vh; overflow: hidden; touch-action: none;
+            -webkit-user-select: none; user-select: none;
+        }
+        canvas { 
+            border: 4px solid #ff007f; background-color: #0a0a12; 
+            box-shadow: 0 0 30px rgba(255, 0, 127, 0.4);
+            max-width: 100vw; max-height: 100vh; object-fit: contain;
+        }
+        #ui-panel { 
+            position: absolute; top: 50px; left: 10px; background: rgba(5, 5, 10, 0.85); 
+            padding: 12px; border-radius: 8px; border: 2px solid #00f0ff; pointer-events: none;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.2); z-index: 5;
+        }
+        .stat { margin-bottom: 5px; font-weight: bold; font-size: 14px; text-shadow: 0 0 5px rgba(0, 240, 255, 0.5); }
+        #help-btn {
+            position: absolute; bottom: 15px; left: 15px; background: #050510; color: #ff007f;
+            border: 2px solid #ff007f; padding: 10px 18px; font-family: 'Consolas', monospace;
+            font-weight: bold; font-size: 14px; border-radius: 5px; cursor: pointer;
+            box-shadow: 0 0 10px rgba(255, 0, 127, 0.3); transition: all 0.2s ease;
+            z-index: 10;
+        }
+        #help-btn:hover { background: #ff007f; color: #fff; box-shadow: 0 0 20px rgba(255, 0, 127, 0.7); }
+        #guide-overlay {
+            display: flex; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(4, 4, 8, 0.9); z-index: 100; align-items: center; justify-content: center;
+        }
+        #guide-box {
+            background: #0a0a16; border: 3px solid #00f0ff; padding: 25px; border-radius: 10px;
+            max-width: 450px; width: 85%; box-shadow: 0 0 30px rgba(0, 240, 255, 0.4);
+            text-align: left; line-height: 1.5;
+        }
+        #guide-box h2 { color: #ffff00; margin-top: 0; text-align: center; text-shadow: 0 0 8px rgba(255,255,0,0.5); }
+        #guide-box ul { padding-left: 20px; color: #fff; }
+        #guide-box li { margin-bottom: 8px; }
+        #close-btn {
+            display: block; margin: 20px auto 0; background: transparent; color: #00f0ff;
+            border: 2px solid #00f0ff; padding: 8px 20px; font-family: 'Consolas', monospace;
+            font-weight: bold; border-radius: 4px; cursor: pointer; transition: 0.2s;
+        }
+        #close-btn:hover { background: #00f0ff; color: #000; box-shadow: 0 0 15px #00f0ff; }
+    </style>
+</head>
+<body>
+
+    <div id="ui-panel">
+        <div class="stat">SECTOR: <span id="coord-val" style="color: #fff;">0, 0</span></div>
+        <div class="stat">LEVEL : <span id="level-val" style="color: #ffff00;">1</span></div>
+        <div class="stat">BLADES: <span id="sword-val" style="color: #00ff66;">1 / 40</span></div>
+        <div class="stat">SCORE : <span id="score-val" style="color: #fff;">0</span></div>
+    </div>
+
+    <button id="help-btn" onclick="openGuide()">FULL MANUAL</button>
+
+    <div id="guide-overlay">
+        <div id="guide-box">
+            <h2>FULL INTEL</h2>
+            <ul>
+                <li><strong>PC Controls:</strong> Arrow keys / WASD to move.</li>
+                <li><strong>Mobile Controls:</strong> Use the Virtual Joystick locked on the bottom-right side.</li>
+                <li><strong>Combat:</strong> Strike enemy core bodies with your auto-spinning blades.</li>
+                <li><strong>Looting:</strong> Defeating an enemy lets you absorb their active arsenal.</li>
+            </ul>
+            <button id="close-btn" onclick="closeGuide()">START</button>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        const uiCoord = document.getElementById("coord-val");
+        const uiLevel = document.getElementById("level-val");
+        const uiSword = document.getElementById("sword-val");
+        const uiScore = document.getElementById("score-val");
+
+        let score = 0;
+        let gameOver = false;
+        let isPaused = true; 
+
+        const viewX = canvas.width / 2;
+        const viewY = canvas.height / 2;
+
+        let player = {
+            id: "PLAYER", x: 0, y: 0, radius: 18, speed: 4.5, level: 1,
+            swordCount: 1, swordOrbitRadius: 55, swordAngle: 0, swordDirection: 1, swordSpeed: 0.04
+        };
+
+        const MAX_ENEMIES = 20; 
+
+        const tickerData = {
+            messages: [
+                "SYSTEM ONLINE... WELCOME TO THE ENDLESS CHOPPER ARENA ON SWORD CHASE : CHAOS.",
+                "TUTORIAL: USE ARROW KEYS / WASD (PC) OR THE FIXED JOYSTICK (MOBILE) TO CRUISE.",
+                "OBJECTIVE: ATTACK ENEMY CORE BODIES USING YOUR SPINNING ENERGY BLADES.",
+                "WARNING: DO NOT LET ENEMY PLASMA BLADES TOUCH YOUR BLUE CORE EMBLEM."
+            ],
+            currentIdx: 0, x: canvas.width + 10, y: 25, speed: 2.2, active: true
+        };
+
+        // KONFIGURASI JOYSTICK DI KANAN BAWAH (TERKUNCI)
+        const joystick = { 
+            baseX: canvas.width - 120, // 120 piksel dari kanan canvas
+            baseY: canvas.height - 120, // 120 piksel dari bawah canvas
+            stickX: canvas.width - 120, 
+            stickY: canvas.height - 120, 
+            baseRadius: 55, 
+            stickRadius: 25, 
+            active: false, 
+            touchId: null, 
+            inputX: 0, 
+            inputY: 0 
+        };
+
+        function getSwordColor(level) {
+            if (level <= 3) return '#00f0ff'; 
+            if (level <= 7) return '#00ff66'; 
+            if (level <= 12) return '#ffff00'; 
+            return '#ff007f'; 
+        }
+
+        function openGuide() { isPaused = true; document.getElementById("guide-overlay").style.display = "flex"; }
+        function closeGuide() { isPaused = false; document.getElementById("guide-overlay").style.display = "none"; }
+
+        function resetGame() {
+            score = 0; gameOver = false; isPaused = false; enemies = [];
+            player.x = 0; player.y = 0; player.level = 1; player.swordCount = 1;
+            player.swordOrbitRadius = 55; player.swordAngle = 0; player.swordDirection = 1;
+            generatedChunks = {};
+            // Kembalikan posisi stick analog ke pusat saat game reset
+            joystick.stickX = joystick.baseX; joystick.stickY = joystick.baseY;
+            joystick.inputX = 0; joystick.inputY = 0; joystick.active = false;
+        }
+
+        const CHUNK_SIZE = 600; 
+        let generatedChunks = {}; 
+
+        function hash(x, y) { return Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; }
+
+        function getLocalEntities() {
+            let obstacles = []; let localSupplies = [];
+            let currentChunkX = Math.floor(player.x / CHUNK_SIZE);
+            let currentChunkY = Math.floor(player.y / CHUNK_SIZE);
+
+            for (let cx = currentChunkX - 1; cx <= currentChunkX + 1; cx++) {
+                for (let cy = currentChunkY - 1; cy <= currentChunkY + 1; cy++) {
+                    let chunkKey = `${cx},${cy}`;
+                    if (!generatedChunks[chunkKey]) {
+                        let obs = []; let sups = []; let h = hash(cx, cy); let seed = h - Math.floor(h);
+                        if (cx !== 0 || cy !== 0) { 
+                            let startX = cx * CHUNK_SIZE; let startY = cy * CHUNK_SIZE;
+                            if (seed > 0.5) {
+                                obs.push({ x: startX + 150, y: startY, width: 40, height: 220 }); 
+                                obs.push({ x: startX + 150, y: startY + 360, width: 40, height: 240 }); 
+                                obs.push({ x: startX + 400, y: startY + 150, width: 40, height: 350 });
+                            } else {
+                                obs.push({ x: startX, y: startY + 200, width: 450, height: 40 });
+                                obs.push({ x: startX + 200, y: startY + 420, width: 400, height: 40 });
+                            }
+                        }
+                        if (seed < 0.25) {
+                            sups.push({
+                                id: `sup_${cx}_${cy}_${Math.floor(seed*1000)}`,
+                                x: cx * CHUNK_SIZE + 250 + (Math.abs(seed * 400) % 200),
+                                y: cy * CHUNK_SIZE + 250 + (Math.abs(seed * 800) % 200),
+                                size: 16, taken: false 
+                            });
+                        }
+                        generatedChunks[chunkKey] = { obstacles: obs, supplies: sups };
+                    }
+                    obstacles = obstacles.concat(generatedChunks[chunkKey].obstacles);
+                    let activeSupplies = generatedChunks[chunkKey].supplies.filter(s => !s.taken);
+                    localSupplies = localSupplies.concat(activeSupplies);
+                }
+            }
+            return { obstacles, localSupplies };
+        }
+
+        function checkCircleRectCollision(circle, rect) {
+            let closestX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.width));
+            let closestY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.height));
+            return (circle.x - closestX)**2 + (circle.y - closestY)**2 < (circle.radius**2);
+        }
+        function checkPointRectCollision(pX, pY, rect) { return pX >= rect.x && pX <= rect.x + rect.width && pY >= rect.y && pY <= rect.y + rect.height; }
+        function getDistance(x1, y1, x2, y2) { return Math.hypot(x2 - x1, y2 - y1); }
+
+        const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, w: false, s: false, a: false, d: false };
+        window.addEventListener('keydown', (e) => { if (e.key in keys) keys[e.key] = true; });
+        window.addEventListener('keyup', (e) => { if (e.key in keys) keys[e.key] = false; });
+        
+        // EVENT LISTENER SENTUHAN MOBILE (DIPERBAIKI)
+        canvas.addEventListener('touchstart', (e) => {
+            if (gameOver) { resetGame(); return; }
+            if (isPaused) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                // Konversi koordinat layar HP ke koordinat internal Canvas
+                const tX = (touch.clientX - rect.left) * (canvas.width / rect.width);
+                const tY = (touch.clientY - rect.top) * (canvas.height / rect.height);
+                
+                // Cek apakah sentuhan berada di area deteksi joystick (kanan bawah)
+                const distToJoystickBase = Math.hypot(tX - joystick.baseX, tY - joystick.baseY);
+                
+                // Toleransi area sentuh dibuat sedikit lebih besar (baseRadius + 40) agar mudah ditekan
+                if (distToJoystickBase <= joystick.baseRadius + 40) { 
+                    joystick.active = true; 
+                    joystick.touchId = touch.identifier;
+                    updateJoystickPosition(tX, tY);
+                    break; 
+                }
+            }
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (!joystick.active || isPaused) return; 
+            e.preventDefault(); // Mencegah browser mobile melakukan scroll otomatis saat bermain
+            const rect = canvas.getBoundingClientRect();
+            for (let i = 0; i < e.touches.length; i++) {
+                const touch = e.touches[i];
+                if (touch.identifier === joystick.touchId) {
+                    const tX = (touch.clientX - rect.left) * (canvas.width / rect.width);
+                    const tY = (touch.clientY - rect.top) * (canvas.height / rect.height);
+                    updateJoystickPosition(tX, tY);
+                }
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === joystick.touchId) {
+                    joystick.active = false; 
+                    joystick.touchId = null; 
+                    joystick.stickX = joystick.baseX; // Kembalikan knob ke tengah
+                    joystick.stickY = joystick.baseY; 
+                    joystick.inputX = 0; 
+                    joystick.inputY = 0; 
+                    break;
+                }
+            }
+        });
+
+        function updateJoystickPosition(tX, tY) {
+            const dx = tX - joystick.baseX; 
+            const dy = tY - joystick.baseY; 
+            const dist = Math.hypot(dx, dy);
+            
+            if (dist <= joystick.baseRadius) { 
+                joystick.stickX = tX; 
+                joystick.stickY = tY; 
+            } else { 
+                joystick.stickX = joystick.baseX + (dx / dist) * joystick.baseRadius; 
+                joystick.stickY = joystick.baseY + (dy / dist) * joystick.baseRadius; 
+            }
+            // Normalisasi nilai input menjadi antara -1 dan 1
+            joystick.inputX = (joystick.stickX - joystick.baseX) / joystick.baseRadius; 
+            joystick.inputY = (joystick.stickY - joystick.baseY) / joystick.baseRadius;
+        }
+
+        canvas.addEventListener('click', () => { if (gameOver) resetGame(); });
+
+        function drawJoystick() {
+            ctx.save();
+            // Lingkaran Luar (Base Ring)
+            ctx.beginPath(); ctx.arc(joystick.baseX, joystick.baseY, joystick.baseRadius, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(0, 240, 255, 0.05)"; ctx.fill();
+            ctx.strokeStyle = "rgba(0, 240, 255, 0.3)"; ctx.lineWidth = 3; ctx.stroke();
+            
+            // Lingkaran Dalam (Knob Stick)
+            ctx.beginPath(); ctx.arc(joystick.stickX, joystick.stickY, joystick.stickRadius, 0, Math.PI * 2);
+            ctx.fillStyle = joystick.active ? "rgba(255, 0, 127, 0.8)" : "rgba(0, 240, 255, 0.4)"; ctx.fill();
+            ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawNeonCharacter(screenX, screenY, radius, glowColor, level) {
+            ctx.save(); ctx.translate(screenX, screenY);
+            ctx.shadowBlur = 15; ctx.shadowColor = glowColor;
+            ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.fillStyle = "#05050a"; ctx.fill();
+            ctx.strokeStyle = glowColor; ctx.lineWidth = 3; ctx.stroke();
+            ctx.shadowBlur = 0; ctx.fillStyle = "#fff"; ctx.font = "bold 11px 'Consolas'"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+            ctx.fillText(level, 0, 0); ctx.restore();
+        }
+
+        function drawNeonSword(screenX, screenY, angle, bladeColor) {
+            ctx.save(); ctx.translate(screenX, screenY); ctx.rotate(angle + Math.PI / 2); 
+            ctx.shadowBlur = 12; ctx.shadowColor = bladeColor;
+            ctx.fillStyle = "#fff"; ctx.fillRect(-2.5, -35, 5, 35);
+            ctx.strokeStyle = bladeColor; ctx.lineWidth = 1.5; ctx.strokeRect(-2.5, -35, 5, 35);
+            ctx.shadowBlur = 0; ctx.fillStyle = "#333"; ctx.fillRect(-6, 0, 12, 3); ctx.restore();
+        }
+
+        function drawNeonTicker() {
+            if (!tickerData.active) return;
+            ctx.save();
+            ctx.fillStyle = "rgba(4, 4, 10, 0.9)"; ctx.fillRect(0, 0, canvas.width, 40);
+            ctx.strokeStyle = "#ffff00"; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(0, 40); ctx.lineTo(canvas.width, 40); ctx.stroke();
+            ctx.font = "bold 13px 'Consolas'"; ctx.fillStyle = "#ffff00"; ctx.shadowBlur = 8; ctx.shadowColor = "#ffff00";
+            let msg = tickerData.messages[tickerData.currentIdx];
+            ctx.fillText(msg, tickerData.x, tickerData.y);
+            let textWidth = ctx.measureText(msg).width; ctx.restore();
+            tickerData.x -= tickerData.speed;
+            if (tickerData.x < -textWidth) {
+                tickerData.x = canvas.width + 10; tickerData.currentIdx++;          
+                if (tickerData.currentIdx >= tickerData.messages.length) { tickerData.active = false; }
+            }
+        }
+
+        let enemies = [];
+        function spawnSingleEnemy() {
+            let angle = Math.random() * Math.PI * 2;
+            let spawnDist = 550 + Math.random() * 250; 
+            let eX = player.x + Math.cos(angle) * spawnDist;
+            let eY = player.y + Math.sin(angle) * spawnDist;
+            let enemyLevel = Math.max(1, player.level + Math.floor(Math.random() * 5) - 2);
+            
+            enemies.push({
+                id: Math.random().toString(36).substr(2, 9),
+                x: eX, y: eY, radius: 16, level: enemyLevel, speed: 1.5 + (enemyLevel * 0.04),
+                swordCount: Math.min(40, 1 + Math.floor(enemyLevel / 2)), 
+                swordAngle: Math.random() * Math.PI * 2, swordDirection: 1, swordSpeed: 0.035, swordOrbitRadius: 42 + (Math.floor(enemyLevel/2)*1.5),
+                bounceCooldown: 0, slideDirection: Math.random() < 0.5 ? 1 : -1 
+            });
+        }
+
+        function maintainEnemyPopulation() {
+            while (enemies.length < MAX_ENEMIES && !gameOver && !isPaused) { spawnSingleEnemy(); }
+        }
+
+        function rewardKiller(killerId, victimSwords) {
+            let lootCount = Math.max(1, victimSwords);
+            if (killerId === "PLAYER") {
+                player.swordCount = Math.min(40, player.swordCount + lootCount);
+                player.level += 1; score += 50;
+            } else {
+                let killerNpc = enemies.find(e => e.id === killerId);
+                if (killerNpc) {
+                    killerNpc.swordCount = Math.min(40, killerNpc.swordCount + lootCount);
+                    killerNpc.level += 1;
+                    killerNpc.swordOrbitRadius = 42 + (killerNpc.swordCount * 1.5);
+                }
+            }
+        }
+
+        function drawMinimap(obstacles) {
+            const mSize = 130; const mX = canvas.width - mSize - 15; const mY = tickerData.active ? 55 : 15;
+            const mRadius = mSize / 2; const mCenterX = mX + mRadius; const mCenterY = mY + mRadius; const scale = 0.12;
+            ctx.save();
+            ctx.beginPath(); ctx.arc(mCenterX, mCenterY, mRadius, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(5, 5, 12, 0.85)"; ctx.fill(); ctx.strokeStyle = "#ff007f"; ctx.lineWidth = 2; ctx.stroke();
+            ctx.clip(); 
+            ctx.fillStyle = "rgba(170, 0, 255, 0.25)"; ctx.strokeStyle = "rgba(170, 0, 255, 0.5)"; ctx.lineWidth = 1;
+            for (let obs of obstacles) {
+                let rX = mCenterX + (obs.x - player.x) * scale; let rY = mCenterY + (obs.y - player.y) * scale;
+                let rW = obs.width * scale; let rH = obs.height * scale;
+                ctx.fillRect(rX, rY, rW, rH); ctx.strokeRect(rX, rY, rW, rH);
+            }
+            for (let e of enemies) {
+                let eX = mCenterX + (e.x - player.x) * scale; let eY = mCenterY + (e.y - player.y) * scale;
+                ctx.beginPath(); ctx.arc(eX, eY, 3, 0, Math.PI * 2); ctx.fillStyle = (e.level > player.level) ? "#ff007f" : "#00ff66"; ctx.fill();
+            }
+            ctx.beginPath(); ctx.arc(mCenterX, mCenterY, 3.5, 0, Math.PI * 2); ctx.fillStyle = "#00f0ff"; ctx.fill();
+            ctx.restore();
+        }
+
+        let playerBounceCooldown = 0;
+
+        function animate() {
+            if (isPaused) { 
+                ctx.fillStyle = "#050508"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                requestAnimationFrame(animate); return; 
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (gameOver) {
+                ctx.fillStyle = "rgba(4, 4, 8, 0.96)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "#ff007f"; ctx.font = "bold 45px 'Consolas'"; ctx.textAlign = "center"; ctx.shadowBlur = 15; ctx.shadowColor = "#ff007f";
+                ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 25);
+                ctx.font = "18px 'Consolas'"; ctx.fillStyle = "#00f0ff"; ctx.shadowColor = "#00f0ff";
+                ctx.fillText(`Score: ${score} | Final Level: ${player.level}`, canvas.width / 2, canvas.height / 2 + 20);
+                ctx.fillStyle = "#ffff00"; ctx.shadowColor = "#ffff00";
+                ctx.fillText("Tap anywhere to play again", canvas.width / 2, canvas.height / 2 + 70);
+                ctx.shadowBlur = 0; requestAnimationFrame(animate); return;
+            }
+
+            const { obstacles, localSupplies } = getLocalEntities();
+            maintainEnemyPopulation();
+
+            // INPUT KEYBOARD PC ATAU JOYSTICK MOBILE
+            let moveX = 0; let moveY = 0;
+            if (keys.ArrowLeft || keys.a) moveX = -1; if (keys.ArrowRight || keys.d) moveX = 1;
+            if (keys.ArrowUp || keys.w) moveY = -1; if (keys.ArrowDown || keys.s) moveY = 1;
+
+            let nextX = player.x; let nextY = player.y;
+            if (moveX !== 0 || moveY !== 0) {
+                const length = Math.hypot(moveX, moveY);
+                nextX += (moveX / length) * player.speed; nextY += (moveY / length) * player.speed;
+            } else if (joystick.active) {
+                nextX += joystick.inputX * player.speed; nextY += joystick.inputY * player.speed;
+            }
+
+            let playerBodyBlocked = false;
+            for (let obs of obstacles) { if (checkCircleRectCollision({ x: nextX, y: nextY, radius: player.radius }, obs)) { playerBodyBlocked = true; break; } }
+            if (!playerBodyBlocked) { player.x = nextX; player.y = nextY; }
+
+            // Grid Floor
+            ctx.strokeStyle = "#171226"; ctx.lineWidth = 1.5;
+            let startGridX = Math.floor((player.x - viewX) / 50) * 50; let startGridY = Math.floor((player.y - viewY) / 50) * 50;
+            for (let gx = startGridX; gx < startGridX + canvas.width + 100; gx += 50) { ctx.beginPath(); ctx.moveTo(gx - player.x + viewX, 0); ctx.lineTo(gx - player.x + viewX, canvas.height); ctx.stroke(); }
+            for (let gy = startGridY; gy < startGridY + canvas.height + 100; gy += 50) { ctx.beginPath(); ctx.moveTo(0, gy - player.y + viewY); ctx.lineTo(canvas.width, gy - player.y + viewY); ctx.stroke(); }
+
+            // Obstacles
+            ctx.fillStyle = "#140c24"; ctx.strokeStyle = "#aa00ff"; ctx.lineWidth = 3.5;
+            for (let obs of obstacles) { 
+                let sX = obs.x - player.x + viewX; let sY = obs.y - player.y + viewY; 
+                ctx.save(); ctx.shadowBlur = 8; ctx.shadowColor = "#aa00ff";
+                ctx.fillRect(sX, sY, obs.width, obs.height); ctx.strokeRect(sX, sY, obs.width, obs.height); 
+                ctx.restore();
+            }
+
+            // Swords Player
+            player.swordAngle += player.swordSpeed * player.swordDirection;
+            if (playerBounceCooldown > 0) playerBounceCooldown--;
+
+            let playerSwordPositions = [];
+            player.swordOrbitRadius = 48 + (player.swordCount * 1.5); 
+            let pSwordColor = getSwordColor(player.level);
+
+            for (let i = 0; i < player.swordCount; i++) {
+                const angle = player.swordAngle + (i * (Math.PI * 2 / player.swordCount));
+                const absSwordX = player.x + Math.cos(angle) * player.swordOrbitRadius;
+                const absSwordY = player.y + Math.sin(angle) * player.swordOrbitRadius;
+                
+                playerSwordPositions.push({ x: absSwordX, y: absSwordY });
+                drawNeonSword(absSwordX - player.x + viewX, absSwordY - player.y + viewY, angle, pSwordColor);
+
+                if (playerBounceCooldown === 0) {
+                    for (let obs of obstacles) { if (checkPointRectCollision(absSwordX, absSwordY, obs)) { player.swordDirection *= -1; playerBounceCooldown = 8; break; } }
+                }
+            }
+            drawNeonCharacter(viewX, viewY, player.radius, '#00f0ff', player.level);
+
+            // Supplies
+            for (let i = localSupplies.length - 1; i >= 0; i--) {
+                const s = localSupplies[i]; let sX = s.x - player.x + viewX; let sY = s.y - player.y + viewY;
+                ctx.save(); ctx.shadowBlur = 12; ctx.shadowColor = "#ffff00";
+                ctx.fillStyle = '#1a1a05'; ctx.fillRect(sX - s.size/2, sY - s.size/2, s.size, s.size);
+                ctx.strokeStyle = '#ffff00'; ctx.lineWidth = 2; ctx.strokeRect(sX - s.size/2, sY - s.size/2, s.size, s.size);
+                ctx.restore();
+
+                if (getDistance(player.x, player.y, s.x, s.y) < player.radius + s.size/2) {
+                    s.taken = true; 
+                    if (player.swordCount < 40) player.swordCount = Math.min(40, player.swordCount + 1);
+                    player.level++; score += 100; localSupplies.splice(i, 1);
+                }
+            }
+
+            let npcDeadList = new Set();
+            let killRewardsToProcess = [];
+
+            // AI Enemies
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const e = enemies[i];
+                if (npcDeadList.has(e.id)) { enemies.splice(i, 1); continue; }
+
+                let targetX = player.x; let targetY = player.y;
+                let dToPlayer = getDistance(e.x, e.y, player.x, player.y);
+                let closestDist = dToPlayer;
+
+                if (dToPlayer > 450) {
+                    for (let other of enemies) {
+                        if (other.id !== e.id && !npcDeadList.has(other.id)) {
+                            let dToNpc = getDistance(e.x, e.y, other.x, other.y);
+                            if (dToNpc < closestDist) { closestDist = dToNpc; targetX = other.x; targetY = other.y; }
+                        }
+                    }
+                }
+
+                if (closestDist > 0 && closestDist < 1200) {
+                    let angleToTarget = Math.atan2(targetY - e.y, targetX - e.x);
+                    let desiredMoveX = Math.cos(angleToTarget) * e.speed;
+                    let desiredMoveY = Math.sin(angleToTarget) * e.speed;
+                    let testX = e.x + desiredMoveX; let testY = e.y + desiredMoveY;
+
+                    let hitWall = false;
+                    for (let obs of obstacles) { if (checkCircleRectCollision({ x: testX, y: testY, radius: e.radius }, obs)) { hitWall = true; break; } }
+
+                    let finalMoveX = desiredMoveX; let finalMoveY = desiredMoveY;
+
+                    if (hitWall) {
+                        let slideAngle = angleToTarget + (Math.PI / 2) * e.slideDirection;
+                        finalMoveX = Math.cos(slideAngle) * e.speed; finalMoveY = Math.sin(slideAngle) * e.speed;
+                        let slideTestX = e.x + finalMoveX; let slideTestY = e.y + finalMoveY;
+                        let slideBlocked = false;
+                        for (let obs of obstacles) { if (checkCircleRectCollision({ x: slideTestX, y: slideTestY, radius: e.radius }, obs)) { slideBlocked = true; break; } }
+                        if (slideBlocked) { e.slideDirection *= -1; finalMoveX = 0; finalMoveY = 0; }
+                    }
+                    e.x += finalMoveX; e.y += finalMoveY;
+                }
+
+                let eScreenX = e.x - player.x + viewX; let eScreenY = e.y - player.y + viewY;
+
+                if (eScreenX > -60 && eScreenX < canvas.width + 60 && eScreenY > -60 && eScreenY < canvas.height + 60) {
+                    const isStrongerThanPlayer = e.level > player.level;
+                    let npcColor = isStrongerThanPlayer ? '#ff007f' : '#00ff66';
+                    drawNeonCharacter(eScreenX, eScreenY, e.radius, npcColor, e.level);
+
+                    e.swordAngle += e.swordSpeed * e.swordDirection;
+                    if (e.bounceCooldown > 0) e.bounceCooldown--;
+
+                    let eSwordColor = getSwordColor(e.level);
+
+                    for (let j = 0; j < e.swordCount; j++) {
+                        let eAngle = e.swordAngle + (j * (Math.PI * 2 / e.swordCount));
+                        let absNpcSwordX = e.x + Math.cos(eAngle) * e.swordOrbitRadius;
+                        let absNpcSwordY = e.y + Math.sin(eAngle) * e.swordOrbitRadius;
+                        
+                        drawNeonSword(absNpcSwordX - player.x + viewX, absNpcSwordY - player.y + viewY, eAngle, eSwordColor);
+
+                        if (e.bounceCooldown === 0) {
+                            for (let obs of obstacles) { if (checkPointRectCollision(absNpcSwordX, absNpcSwordY, obs)) { e.swordDirection *= -1; e.bounceCooldown = 8; break; } }
+                        }
+
+                        // Combat
+                        for (let pIdx = playerSwordPositions.length - 1; pIdx >= 0; pIdx--) {
+                            let pSw = playerSwordPositions[pIdx];
+                            if (getDistance(pSw.x, pSw.y, absNpcSwordX, absNpcSwordY) < 25) {
+                                if (player.level > e.level) { 
+                                    e.swordCount = Math.max(0, e.swordCount - 1); 
+                                    if(e.swordCount <= 0 && !npcDeadList.has(e.id)) { npcDeadList.add(e.id); killRewardsToProcess.push({ killerId: "PLAYER", swords: 1 }); }
+                                    score += 10; 
+                                } 
+                                else if (e.level > player.level) { player.swordCount = Math.max(1, player.swordCount - 1); }
+                                playerSwordPositions.splice(pIdx, 1); break;
+                            }
+                        }
+
+                        for (let other of enemies) {
+                            if (other.id !== e.id && !npcDeadList.has(other.id)) {
+                                if (getDistance(absNpcSwordX, absNpcSwordY, other.x, other.y) < other.radius + 15) {
+                                    other.swordCount--;
+                                    if (other.swordCount <= 0 && !npcDeadList.has(other.id)) { 
+                                        npcDeadList.add(other.id); killRewardsToProcess.push({ killerId: e.id, swords: Math.max(1, Math.floor(other.level / 2)) }); 
+                                    }
+                                }
+                            }
+                        }
+
+                        if (getDistance(absNpcSwordX, absNpcSwordY, player.x, player.y) < player.radius + 15) { gameOver = true; break; }
+                    }
+
+                    if (gameOver) break;
+
+                    for (let pSp of playerSwordPositions) {
+                        if (getDistance(pSp.x, pSp.y, e.x, e.y) < e.radius + 18 && !npcDeadList.has(e.id)) { 
+                            npcDeadList.add(e.id); killRewardsToProcess.push({ killerId: "PLAYER", swords: e.swordCount }); break; 
+                        }
+                    }
+                    
+                    if (getDistance(player.x, player.y, e.x, e.y) < player.radius + e.radius && !npcDeadList.has(e.id)) {
+                        if (isStrongerThanPlayer) { gameOver = true; } 
+                        else { npcDeadList.add(e.id); killRewardsToProcess.push({ killerId: "PLAYER", swords: e.swordCount }); }
+                    }
+
+                    for (let other of enemies) {
+                        if (other.id !== e.id && !npcDeadList.has(other.id) && !npcDeadList.has(e.id)) {
+                            if (getDistance(e.x, e.y, other.x, other.y) < e.radius + other.radius) {
+                                if (e.level > other.level) { npcDeadList.add(other.id); killRewardsToProcess.push({ killerId: e.id, swords: other.swordCount }); } 
+                                else if (other.level > e.level) { npcDeadList.add(e.id); killRewardsToProcess.push({ killerId: other.id, swords: e.swordCount }); }
+                                else { npcDeadList.add(other.id); npcDeadList.add(e.id); }
+                            }
+                        }
+                    }
+                }
+                if (dToPlayer > 1400) { enemies.splice(i, 1); }
+            }
+
+            for (let reward of killRewardsToProcess) { rewardKiller(reward.killerId, reward.swords); }
+            enemies = enemies.filter(e => !npcDeadList.has(e.id));
+
+            drawMinimap(obstacles);
+            
+            // JOYSTICK SELALU DIGAMBAR DI MOBILE SEBAGAI PANDUAN VISUAL KANAN BAWAH
+            if ('ontouchstart' in window || joystick.active) {
+                drawJoystick();
+            }
+
+            uiCoord.innerText = `${Math.floor(player.x)}, ${Math.floor(player.y)}`;
+            uiLevel.innerText = player.level; uiSword.innerText = `${player.swordCount} / 40`; uiScore.innerText = score;
+
+            drawNeonTicker();
+
+            if (tickerData.active) { document.getElementById("ui-panel").style.top = "50px"; } 
+            else { document.getElementById("ui-panel").style.top = "10px"; }
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
