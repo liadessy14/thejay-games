@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jay Bunny Adventure</title>
+
+<style>
+body{
+    margin:0;
+    overflow:hidden;
+    background:#87ceeb;
+    touch-action:none;
+}
+
+canvas{
+    display:block;
+    margin:auto;
+    background:linear-gradient(#caa8ff,#f3e8ff);
+    max-width:100vw;
+}
+
+
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+
+
+<script>
+
+const canvas = document.getElementById("game");
+canvas.width = Math.min(window.innerWidth, 400);
+canvas.height = window.innerHeight;
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playJumpSound(){
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.type = "square";
+    osc.frequency.setValueAtTime(500, audioCtx.currentTime);
+
+    gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        audioCtx.currentTime + 0.15
+    );
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.15);
+}
+function playGameOverSound(){
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.type = "triangle";
+
+    osc.frequency.setValueAtTime(250, audioCtx.currentTime);
+
+    osc.frequency.linearRampToValueAtTime(
+        120,
+        audioCtx.currentTime + 0.2
+    );
+
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+
+    gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        audioCtx.currentTime + 0.25
+    );
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.25);
+}
+function playCarrotSound(){
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(900, audioCtx.currentTime);
+
+    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        audioCtx.currentTime + 0.1
+    );
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.1);
+}
+
+
+const ctx = canvas.getContext("2d");
+
+let score = 0;
+let best = Number(localStorage.getItem("jayBest")) || 0;
+
+let gameState = "start";
+
+const bunny = {
+    x:180,
+    y:500,
+    w:40,
+    h:50,
+    vx:0,
+    vy:0
+};
+
+let leftPressed = false;
+let rightPressed = false;
+
+let touchActive = false;
+
+canvas.addEventListener("pointerdown", e => {
+
+    if(gameState === "start"){
+        gameState = "play";
+        return;
+    }
+
+    if(gameState === "gameover"){
+        score = 0;
+        bunny.x = 180;
+        bunny.y = 500;
+        bunny.vy = 0;
+        createPlatforms();
+        gameState = "play";
+        return;
+    }
+
+    touchActive = true;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+
+    if(x < canvas.width / 2){
+        leftPressed = true;
+        rightPressed = false;
+    }else{
+        rightPressed = true;
+        leftPressed = false;
+    }
+
+});
+
+canvas.addEventListener("pointermove", e => {
+
+    if(!touchActive) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+
+    if(x < canvas.width / 2){
+        leftPressed = true;
+        rightPressed = false;
+    }else{
+        rightPressed = true;
+        leftPressed = false;
+    }
+
+});
+
+function stopTouch(){
+
+    touchActive = false;
+    leftPressed = false;
+    rightPressed = false;
+
+}
+
+canvas.addEventListener("pointerup", stopTouch);
+canvas.addEventListener("pointercancel", stopTouch);
+canvas.addEventListener("pointerleave", stopTouch);
+
+
+document.addEventListener("keydown",e=>{
+    if(e.key==="ArrowLeft") leftPressed=true;
+    if(e.key==="ArrowRight") rightPressed=true;
+});
+
+document.addEventListener("keyup",e=>{
+    if(e.key==="ArrowLeft") leftPressed=false;
+    if(e.key==="ArrowRight") rightPressed=false;
+});
+
+let platforms=[];
+let carrots=[];
+let stars = [];
+let birds = [];
+let clouds = [
+    {x:40, y:80, speed:0.3},
+    {x:280, y:120, speed:0.2},
+    {x:150, y:220, speed:0.4}
+];
+
+for(let i=0;i<2;i++){
+    birds.push({
+        x: Math.random()*400,
+        y: 80 + Math.random()*120,
+        speed: 1 + Math.random()*2
+    });
+}
+
+function createPlatforms(){
+
+    platforms=[];
+    carrots=[];
+
+    for(let i=0;i<6;i++){
+
+        let px = Math.random() * 300;
+        let py = i*75;
+
+        platforms.push({
+            x:px,
+            y:py,
+            w:90,
+            h:15,
+            dx:2
+        });
+
+        if(i % 2 === 0){
+            carrots.push({
+                x:px + 30,
+                y:py - 25,
+                collected:false
+            });
+        }
+
+    }
+
+    // platform khusus tempat mulai
+    platforms.push({
+        x:155,
+        y:580,
+        w:90,
+        h:15,
+        dx:0
+    });
+}
+
+createPlatforms();
+
+function drawCloud(x,y){
+    ctx.fillStyle = "#FFFFFF";
+    ctx.beginPath();
+    ctx.arc(x,y,15,0,Math.PI*2);
+    ctx.arc(x+15,y-5,18,0,Math.PI*2);
+    ctx.arc(x+35,y,15,0,Math.PI*2);
+    ctx.fill();
+
+}
+function drawBird(b){
+    ctx.font = "20px Arial";
+    ctx.fillText("🦋", b.x, b.y);
+}
+function drawBunny(x,y){
+
+    // telinga luar
+    ctx.fillStyle = "#b266ff";
+    ctx.beginPath();
+    ctx.ellipse(x+12, y-10, 6, 18, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.ellipse(x+28, y-10, 6, 18, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // telinga dalam
+    ctx.fillStyle = "#ffb6d9";
+    ctx.beginPath();
+    ctx.ellipse(x+12, y-10, 3, 12, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.ellipse(x+28, y-10, 3, 12, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // kepala
+    ctx.fillStyle = "#b266ff";
+    ctx.beginPath();
+    ctx.arc(x+20, y+10, 20, 0, Math.PI*2);
+    ctx.fill();
+
+    // mata
+    ctx.fillStyle = "white";
+    ctx.beginPath();
+    ctx.arc(x+14, y+6, 3, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(x+26, y+6, 3, 0, Math.PI*2);
+    ctx.fill();
+
+    // pupil
+    ctx.fillStyle = "black";
+    ctx.beginPath();
+    ctx.arc(x+14, y+6, 1.2, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(x+26, y+6, 1.2, 0, Math.PI*2);
+    ctx.fill();
+
+    // hidung
+    ctx.fillStyle = "pink";
+    ctx.beginPath();
+    ctx.arc(x+20, y+13, 2.5, 0, Math.PI*2);
+    ctx.fill();
+
+    // senyum
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x+20, y+16, 6, 0.2, Math.PI-0.2);
+    ctx.stroke();
+}
+
+function drawPlatform(p){
+
+    ctx.fillStyle="#1b8d35";
+    ctx.fillRect(p.x,p.y,p.w,p.h);
+
+    ctx.fillStyle="#46d75e";
+    ctx.fillRect(p.x,p.y,p.w,5);
+}
+function drawCarrot(c){
+
+    if(c.collected) return;
+
+    ctx.font = "24px Arial";
+    ctx.fillText("🥕", c.x, c.y);
+
+}
+
+function update(){
+    if(gameState !== "play") return;
+
+    if(leftPressed) bunny.vx=-7;
+    else if(rightPressed) bunny.vx=7;
+    else bunny.vx=0;
+
+    bunny.x+=bunny.vx;
+
+    if(bunny.x<-40) bunny.x=canvas.width;
+    if(bunny.x>canvas.width) bunny.x=-40;
+
+    bunny.vy+=0.4;
+    bunny.y+=bunny.vy;
+    carrots.forEach(c => {
+
+    if(c.collected) return;
+
+    if(
+    bunny.x < c.x + 25 &&
+    bunny.x + bunny.w > c.x &&
+    bunny.y < c.y + 25 &&
+    bunny.y + bunny.h > c.y
+){
+    c.collected = true;
+score += 100;
+
+playCarrotSound();
+
+    for(let i=0;i<5;i++){
+        stars.push({
+            x:c.x,
+            y:c.y,
+            vx:(Math.random()-0.5)*4,
+            vy:(Math.random()-0.5)*4,
+            life:30
+        });
+    }
+}
+
+});
+
+    platforms.forEach(p=>{
+        if(score >= 4000){
+
+    p.x += p.dx;
+
+    if(p.x <= 0 || p.x + p.w >= canvas.width){
+        p.dx *= -1;
+    }
+
+}
+
+        
+        if(
+            bunny.vy>0 &&
+            bunny.x+bunny.w>p.x &&
+            bunny.x<p.x+p.w &&
+            bunny.y+bunny.h>p.y &&
+            bunny.y+bunny.h<p.y+p.h+15
+        ){
+            bunny.vy=-14;
+playJumpSound();
+        }
+
+    });
+
+    if(bunny.y<250){
+
+    let move = 250-bunny.y;
+    bunny.y=250;
+
+    platforms.forEach(p=>{
+        p.y+=move;
+    });
+
+    carrots.forEach(c=>{
+        c.y+=move;
+    });
+
+    score += Math.floor(move);
+    if(carrots.length < 5){
+
+    carrots.push({
+        x:Math.random()*350,
+        y:-100,
+        collected:false
+    });
+
+}
+}
+
+    platforms.forEach(p=>{
+
+    if(p.y > canvas.height){
+
+    let difficulty = Math.min(score / 500, 80);
+
+    p.y = -20 - difficulty;
+    p.x = bunny.x + (Math.random() * 80 - 40);
+
+p.x = Math.max(20, Math.min(290, p.x));
+
+    // 50% kemungkinan muncul wortel
+    if(Math.random() < 0.5){
+        carrots.push({
+            x: p.x + 30,
+            y: p.y - 25,
+            collected: false
+        });
+    }
+}
+
+    
+
+});
+carrots = carrots.filter(c => !c.collected);
+clouds.forEach(c => {
+
+    c.x += c.speed;
+
+    if(c.x > canvas.width + 50){
+        c.x = -50;
+    }
+
+});
+
+birds.forEach(b => {
+
+    b.x += b.speed;
+    b.y += Math.sin(Date.now()/500 + b.x) * 0.3;
+
+    if(b.x > canvas.width + 30){
+        b.x = -30;
+        b.y = 50 + Math.random() * 200;
+    }
+    stars.forEach(s => {
+    s.x += s.vx;
+    s.y += s.vy;
+    s.life--;
+});
+
+stars = stars.filter(s => s.life > 0);
+
+});
+
+    if(score>best){
+        best=score;
+        localStorage.setItem("jayBest",best);
+    }
+
+    if(bunny.y > canvas.height){
+
+    playGameOverSound();
+
+    gameState = "gameover";
+    return;
+}
+}
+
+function draw(){
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    clouds.forEach(c => {
+    drawCloud(c.x, c.y);
+});
+birds.forEach(drawBird);
+
+platforms.forEach(drawPlatform);
+
+carrots.forEach(drawCarrot);
+stars.forEach(s => {
+
+    ctx.font = "16px Arial";
+    ctx.fillText("✨", s.x, s.y);
+
+});
+drawBunny(bunny.x,bunny.y);
+
+
+
+
+    // PANEL SCORE
+ctx.fillStyle = "rgba(255,255,255,0.85)";
+ctx.fillRect(10, 10, 110, 60);
+
+ctx.strokeStyle = "#8a2be2";
+ctx.lineWidth = 2;
+ctx.strokeRect(10, 10, 110, 60);
+
+// SCORE
+ctx.fillStyle = "#6a0dad";
+ctx.font = "bold 18px Arial";
+ctx.fillText("🏆 " + Math.floor(score/10), 18, 35);
+
+// BEST
+ctx.fillStyle = "#ff9800";
+ctx.fillText("⭐ " + Math.floor(best/10), 18, 60);
+
+// JUDUL GAME
+ctx.textAlign = "center";
+
+ctx.fillStyle = "#6a0dad";
+ctx.font = "28px Arial";
+ctx.textAlign = "center";
+ctx.fillText("🐰", canvas.width/2, 25);
+
+ctx.fillStyle = "#6a0dad";
+ctx.font = "bold 24px Arial";
+ctx.fillText("JAY BUNNY", canvas.width/2, 55);
+
+ctx.fillStyle = "#ff66cc";
+ctx.font = "bold 16px Arial";
+ctx.fillText("ADVENTURE", canvas.width/2, 75);
+
+ctx.textAlign = "left";
+
+if(gameState === "start"){
+
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    ctx.fillStyle = "white";
+    ctx.font = "bold 32px Arial";
+    ctx.textAlign = "center";
+
+    ctx.fillText("🐰 JAY BUNNY", canvas.width/2, canvas.height/2 - 50);
+
+    ctx.font = "20px Arial";
+    ctx.fillText("TAP TO PLAY", canvas.width/2, canvas.height/2 + 20);
+
+    ctx.textAlign = "left";
+}
+if(gameState === "gameover"){
+
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    ctx.fillStyle = "white";
+    ctx.font = "bold 40px Arial";
+    ctx.textAlign = "center";
+
+    ctx.fillText("GAME OVER", 200, 250);
+
+    ctx.font = "22px Arial";
+    ctx.fillText(
+        "Score: " + Math.floor(score/10),
+        200,
+        320
+    );
+
+    ctx.fillText(
+        "Best: " + Math.floor(best/10),
+        200,
+        360
+    );
+
+    ctx.font = "18px Arial";
+    ctx.fillText(
+        "Tap To Restart",
+        200,
+        430
+    );
+
+    ctx.textAlign = "left";
+}
+}
+
+function loop(){
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+loop();
+
+</script>
+</body>
+</html>
