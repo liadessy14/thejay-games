@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>🟣 JAY FARM DELUXE 🟣</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Arial,sans-serif;
+}
+
+body{
+    overflow:hidden;
+    background:linear-gradient(180deg,#4a148c,#1a237e);
+    touch-action:none;
+}
+
+canvas{
+    display:block;
+}
+
+#hud{
+    position:fixed;
+    top:10px;
+    left:10px;
+    color:white;
+    z-index:10;
+    font-size:16px;
+    font-weight:bold;
+    text-shadow:0 0 10px black;
+}
+
+#title{
+    color:#d580ff;
+    font-size:28px;
+}
+
+
+
+#controls{
+    position:fixed;
+    bottom:30px;
+    left:50%;
+    transform:translateX(-50%);
+    width:220px;
+    display:flex;
+    justify-content:space-between;
+    z-index:20;
+}
+
+.ctrl{
+    width:70px;
+    height:70px;
+    border:none;
+    border-radius:50%;
+    font-size:28px;
+    background:#9c27b0;
+    color:white;
+    box-shadow:0 0 20px rgba(255,255,255,.4);
+}
+
+#menu{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.85);
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    color:white;
+    z-index:50;
+    text-align:center;
+}
+
+#menu h1{
+
+    font-size:55px;
+
+    color:white;
+
+    text-shadow:
+    0 0 10px #d580ff,
+    0 0 20px #d580ff,
+    0 0 40px #9c27b0,
+    0 0 60px #9c27b0;
+
+}
+
+#menu button{
+    margin-top:20px;
+    padding:15px 40px;
+    border:none;
+    border-radius:12px;
+    font-size:24px;
+    background:#9c27b0;
+    color:white;
+    cursor:pointer;
+}
+.scoreBox,
+.highBox,
+.lifeBox{
+
+    background:rgba(0,0,0,.35);
+
+    border:2px solid rgba(255,255,255,.15);
+
+    border-radius:15px;
+
+    padding:8px 12px;
+
+    margin-top:10px;
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    min-width:140px;
+
+    box-shadow:0 0 15px rgba(0,0,0,.3);
+
+}
+
+.scoreBox{
+    border-color:#ffd54f;
+}
+
+.highBox{
+    border-color:#ff9800;
+}
+
+.lifeBox{
+    border-color:#ff4081;
+}
+
+#score{
+
+    color:#ffd54f;
+
+    font-size:22px;
+
+    text-shadow:
+    0 0 10px #ffd54f,
+    0 0 20px #ffd54f;
+
+}
+
+#high{
+
+    color:#ffd54f;
+
+    font-size:22px;
+
+    animation:highGlow 1.5s infinite;
+
+}
+
+.info{
+
+    margin:10px;
+
+    font-size:22px;
+
+    font-weight:bold;
+
+    padding:10px 20px;
+
+    border-radius:12px;
+
+    background:rgba(255,255,255,.08);
+
+    border:1px solid rgba(255,255,255,.15);
+
+    box-shadow:0 0 10px rgba(255,255,255,.1);
+
+    min-width:260px;
+
+}
+.challenge{
+
+    margin:20px 0;
+
+    font-size:28px;
+
+    font-weight:bold;
+
+    color:#ffd54f;
+
+    text-shadow:
+        0 0 10px #ffd54f,
+        0 0 20px #ff9800,
+        0 0 30px #ff9800;
+
+}
+
+@keyframes highGlow{
+
+    0%{
+        text-shadow:
+            0 0 5px #ffd54f,
+            0 0 15px #ff9800;
+    }
+
+    50%{
+        text-shadow:
+            0 0 15px #ffd54f,
+            0 0 35px #ff9800,
+            0 0 60px #ff9800;
+    }
+
+    100%{
+        text-shadow:
+            0 0 5px #ffd54f,
+            0 0 15px #ff9800;
+    }
+
+}
+
+</style>
+</head>
+<body>
+
+<div id="hud">
+
+    <div id="title">
+        JAY FARM DELUXE 
+    </div>
+
+    <div class="scoreBox">
+        <span>⭐ SCORE</span>
+        <span id="score">0</span>
+    </div>
+
+    <div class="highBox">
+        <span>🏆 BEST</span>
+        <span id="high">0</span>
+    </div>
+
+    <div class="lifeBox">
+        <span id="lives">❤️❤️❤️</span>
+    </div>
+
+</div>
+
+<canvas id="game"></canvas>
+
+
+<div id="menu">
+
+    <h1>JAY FARM DELUXE </h1>
+
+    <div class="info">
+        🚀 FARM • COLLECT • WIN 🚀
+    </div>
+
+    <div class="info apple">
+        🍎 Apple = +10 Points
+    </div>
+
+    <div class="info corn">
+        🌽 Corn = +10 Points
+    </div>
+
+    <div class="info special">
+        🟣 J Token = +30 Points
+    </div>
+
+    <div class="info bomb">
+        💣 Bomb = Lose 1 Life
+    </div>
+
+    <div class="challenge">
+        🔥 ONLY THE BEST PLAYERS CAN REACH 1000 POINTS 🔥
+    </div>
+
+    <button onclick="startGame()">
+        ▶ PLAY NOW
+    </button>
+
+</div>
+
+<script>
+
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+function playSound(freq){
+
+    const audio = new AudioContext();
+
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
+
+    osc.connect(gain);
+    gain.connect(audio.destination);
+
+    osc.frequency.value = freq;
+
+    gain.gain.value = 0.5;
+
+    osc.start();
+
+    gain.gain.exponentialRampToValueAtTime(
+        0.0001,
+        audio.currentTime + 0.15
+    );
+
+    osc.stop(audio.currentTime + 0.15);
+}
+
+function resize(){
+    canvas.width=window.innerWidth;
+    canvas.height=window.innerHeight;
+}
+resize();
+window.addEventListener("resize",resize);
+
+let score=0;
+let lives=3;
+let highScore=localStorage.getItem("jayFarmHigh") || 1200;
+
+document.getElementById("high").textContent=highScore;
+
+const player={
+    x:200,
+    y:0,
+    w:80,
+    h:80,
+    speed:15
+};
+
+
+let items=[];
+let explosions=[];
+let running=false;
+function updateHUD(){
+    document.getElementById("score").textContent=score;
+    document.getElementById("high").textContent=highScore;
+    document.getElementById("lives").textContent="❤️".repeat(lives);
+}
+
+function spawnItem(){
+
+    const r=Math.random();
+
+    let type="apple";
+    let emoji="🍎";
+    let value=10;
+
+    if(r<0.25){
+    type="apple";
+    emoji="🍎";
+    value=10;
+}
+else if(r<0.45){
+    type="corn";
+    emoji="🌽";
+    value=10;
+}
+else if(r<0.55){
+    type="j";
+    emoji="J";
+    value=30;
+}
+else{
+    type="bomb";
+    emoji="💣";
+    value=-1;
+}
+
+    items.push({
+        x:Math.random()*(canvas.width-50),
+        y:-50,
+        size:50,
+        speed:3+Math.random()*2,
+        emoji,
+        value,
+        type
+    });
+}
+
+setInterval(()=>{
+    if(running) spawnItem();
+},900);
+
+let left=false;
+let right=false;
+
+window.addEventListener("keydown",(e)=>{
+    if(e.key==="ArrowLeft") left=true;
+    if(e.key==="ArrowRight") right=true;
+});
+
+window.addEventListener("keyup",(e)=>{
+    if(e.key==="ArrowLeft") left=false;
+    if(e.key==="ArrowRight") right=false;
+});
+
+function hold(btn,dir){
+
+    btn.addEventListener("touchstart",()=>{
+        if(dir==="left") left=true;
+        else right=true;
+    });
+
+    btn.addEventListener("touchend",()=>{
+        if(dir==="left") left=false;
+        else right=false;
+    });
+
+    btn.addEventListener("mousedown",()=>{
+        if(dir==="left") left=true;
+        else right=true;
+    });
+
+    btn.addEventListener("mouseup",()=>{
+        if(dir==="left") left=false;
+        else right=false;
+    });
+}
+
+canvas.addEventListener("mousemove",(e)=>{
+    player.x = e.clientX - 60;
+});
+
+canvas.addEventListener("touchmove",(e)=>{
+    player.x = e.touches[0].clientX - 60;
+});
+function startGame(){
+
+    document.getElementById("menu").style.display="none";
+
+    score=0;
+    lives=3;
+    items=[];
+
+    player.x=canvas.width/2;
+
+    updateHUD();
+
+    running=true;
+
+    if(document.documentElement.requestFullscreen){
+        document.documentElement.requestFullscreen().catch(()=>{});
+    }
+}
+
+function gameOver(){
+
+    running=false;
+
+    document.getElementById("menu").innerHTML=`
+        <h1>GAME OVER</h1>
+        <div class="info">Score: ${score}</div>
+        <div class="info">High Score: ${highScore}</div>
+        <button onclick="startGame()">PLAY AGAIN</button>
+    `;
+
+    document.getElementById("menu").style.display="flex";
+}
+
+function winGame(){
+
+    running=false;
+
+    document.getElementById("menu").innerHTML=`
+        <h1>🏆 YOU WIN!</h1>
+        <div class="info">Final Score: ${score}</div>
+        <button onclick="startGame()">PLAY AGAIN</button>
+    `;
+
+    document.getElementById("menu").style.display="flex";
+}
+
+function drawPlayer(){
+
+    player.y = canvas.height - 80;
+
+    const x = player.x;
+    const y = player.y;
+
+    // bayangan
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.beginPath();
+    ctx.ellipse(x+60,y+75,45,12,0,0,Math.PI*2);
+    ctx.fill();
+
+    // badan keranjang
+    ctx.fillStyle = "#c58a2b";
+
+    ctx.beginPath();
+    ctx.moveTo(x+10,y+10);
+    ctx.quadraticCurveTo(x+60,y+40,x+110,y+10);
+
+    ctx.lineTo(x+95,y+60);
+
+    ctx.quadraticCurveTo(x+60,y+85,x+25,y+60);
+
+    ctx.closePath();
+    ctx.fill();
+
+    // bibir keranjang
+    ctx.fillStyle = "#d8a13c";
+
+    ctx.beginPath();
+    ctx.ellipse(x+60,y+8,55,12,0,0,Math.PI*2);
+    ctx.fill();
+
+    // bagian dalam
+    ctx.fillStyle = "#b97f28";
+
+ctx.beginPath();
+ctx.ellipse(x+60,y+8,42,7,0,0,Math.PI*2);
+ctx.fill();
+
+    // anyaman vertikal rapi
+
+ctx.strokeStyle = "#9a6220";
+ctx.lineWidth = 2;
+
+for(let i=25;i<=95;i+=12){
+
+    ctx.beginPath();
+
+    ctx.moveTo(x+i,y+18);
+    ctx.lineTo(x+i,y+58);
+
+    ctx.stroke();
+
+}
+
+    
+
+}
+function update(){
+
+    if(!running) return;
+
+    if(left) player.x-=player.speed;
+    if(right) player.x+=player.speed;
+
+    if(player.x<0) player.x=0;
+    if(player.x>canvas.width-60)
+        player.x=canvas.width-60;
+
+    for(let i=items.length-1;i>=0;i--){
+
+        let it=items[i];
+
+        it.y+=it.speed;
+
+        const basketLeft = player.x + 30;
+const basketRight = player.x + 90;
+const basketTop = player.y + 15;
+const basketBottom = player.y + 35;
+
+const hit =
+    it.x + 25 > basketLeft &&
+    it.x + 25 < basketRight &&
+    it.y + 25 > basketTop &&
+    it.y + 25 < basketBottom;
+        if(hit){
+
+            if(it.type==="bomb"){
+
+    playSound(80);
+    playSound(50);
+
+    explosions.push({
+        x: it.x,
+        y: it.y,
+        size: 50,
+        life: 20
+    });
+
+    lives--;
+
+}
+else if(it.type==="apple"){
+
+    playSound(700);
+    score += 10;
+
+}
+else if(it.type==="corn"){
+
+    playSound(600);
+    score += 10;
+
+}
+else if(it.type==="j"){
+
+    playSound(1200);
+    score += 30;
+
+}
+
+            if(score>highScore){
+                highScore=score;
+                localStorage.setItem(
+                    "jayFarmHigh",
+                    highScore
+                );
+            }
+
+            updateHUD();
+
+            items.splice(i,1);
+
+            if(lives<=0){
+                gameOver();
+            }
+
+            if(score>=1000){
+                winGame();
+            }
+
+            continue;
+        }
+
+        if(it.y>canvas.height+50){
+            items.splice(i,1);
+        }
+    }
+}
+
+function draw(){
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    const sky = ctx.createLinearGradient(
+    0,0,0,canvas.height
+);
+
+sky.addColorStop(0,"#0f172a");
+sky.addColorStop(0.5,"#1e3a8a");
+sky.addColorStop(1,"#312e81");
+
+ctx.fillStyle = sky;
+ctx.fillRect(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+);
+// Bulan
+// Bulan bersinar
+ctx.shadowColor = "#fff8b0";
+ctx.shadowBlur = 30;
+
+ctx.fillStyle = "#fff7cc";
+ctx.beginPath();
+ctx.arc(
+    canvas.width - 120,
+    100,
+    35,
+    0,
+    Math.PI * 2
+);
+ctx.fill();
+
+ctx.shadowBlur = 0;
+
+// Kawah bulan
+ctx.fillStyle = "rgba(200,200,200,0.4)";
+ctx.beginPath();
+ctx.arc(canvas.width - 130,90,6,0,Math.PI*2);
+ctx.fill();
+
+ctx.beginPath();
+ctx.arc(canvas.width - 110,110,4,0,Math.PI*2);
+ctx.fill();
+
+ctx.beginPath();
+ctx.arc(canvas.width - 100,85,3,0,Math.PI*2);
+ctx.fill();
+// Bintang
+for(let i=0;i<50;i++){
+
+    ctx.fillStyle="white";
+
+    ctx.beginPath();
+
+    ctx.arc(
+        (i*97)%canvas.width,
+        (i*53)%300,
+        2,
+        0,
+        Math.PI*2
+    );
+
+    ctx.fill();
+}
+    // tanah
+ctx.fillStyle="#5d4037";
+ctx.fillRect(
+    0,
+    canvas.height-50,
+    canvas.width,
+    50
+);
+
+// rumput atas
+ctx.fillStyle="#22c55e";
+ctx.fillRect(
+    0,
+    canvas.height-70,
+    canvas.width,
+    20
+);
+
+// helai rumput
+ctx.strokeStyle="#16a34a";
+ctx.lineWidth=2;
+
+for(let x=0;x<canvas.width;x+=6){
+
+    ctx.beginPath();
+
+    ctx.moveTo(x,canvas.height-50);
+
+    ctx.lineTo(
+        x+Math.random()*6-3,
+        canvas.height-75
+    );
+
+    ctx.stroke();
+}
+    drawPlayer();
+
+    for(let it of items){
+
+    if(it.type==="j"){
+
+        ctx.save();
+
+        ctx.translate(it.x+25,it.y-25);
+        ctx.rotate(Math.PI/4);
+
+        ctx.fillStyle="#a855f7";
+        ctx.fillRect(-25,-25,50,50);
+
+        ctx.rotate(-Math.PI/4);
+
+        ctx.fillStyle="white";
+        ctx.font="bold 34px Arial";
+        ctx.textAlign="center";
+        ctx.fillText("J",0,12);
+
+        ctx.restore();
+
+    }else{
+
+        ctx.font="50px Arial";
+        ctx.fillText(
+            it.emoji,
+            it.x,
+            it.y
+        );
+
+    }
+    for(let i=explosions.length-1;i>=0;i--){
+
+    let ex = explosions[i];
+
+    ctx.font = ex.size + "px Arial";
+    ctx.textAlign = "center";
+
+    ctx.fillText(
+        "💥",
+        ex.x,
+        ex.y
+    );
+
+    ex.size += 4;
+    ex.life--;
+
+    if(ex.life <= 0){
+        explosions.splice(i,1);
+    }
+}
+}
+}
+
+function loop(){
+
+    update();
+    draw();
+
+    requestAnimationFrame(loop);
+}
+
+updateHUD();
+loop();
+
+</script>
+</body>
+</html>
