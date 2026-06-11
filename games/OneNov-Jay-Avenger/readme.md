@@ -120,4 +120,3 @@ Spawn Delay = max(12, 44 - Level × 2.5)
 
 ## Game End Condition
 **No win condition** — game continues until shield reaches 0. High score is the objective.
-```
