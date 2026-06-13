@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Typing Challenge</title>
+
+<style>
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Arial,sans-serif;
+}
+
+body{
+    background:#081120;
+    min-height:100vh;
+    padding:15px;
+    color:white;
+}
+
+.container{
+    max-width:850px;
+    margin:auto;
+}
+
+h1{
+    text-align:center;
+    font-size:2.5rem;
+    margin-bottom:10px;
+
+    text-shadow:
+    0 0 10px #38bdf8,
+    0 0 20px #38bdf8,
+    0 0 40px #38bdf8;
+}
+
+.subtitle{
+    text-align:center;
+    color:#cbd5e1;
+    margin-bottom:25px;
+}
+
+/* SCORE BOXES */
+
+.stats{
+    display:flex;
+    gap:12px;
+    margin-bottom:20px;
+    flex-wrap:wrap;
+}
+
+.stat-box{
+    flex:1;
+    min-width:120px;
+
+    background:#0f172a;
+    border:3px solid #38bdf8;
+    border-radius:20px;
+    padding:15px;
+    text-align:center;
+
+    box-shadow:0 0 10px #38bdf8;
+}
+
+.stat-box h3{
+    font-size:14px;
+    margin-bottom:8px;
+}
+
+.stat-box p{
+    font-size:28px;
+    font-weight:bold;
+}
+
+/* TIMER */
+
+.timer{
+    text-align:center;
+    font-size:22px;
+    margin-bottom:15px;
+}
+
+/* PROGRESS BAR */
+
+.progress-bg{
+    height:18px;
+    background:#1e293b;
+    border-radius:50px;
+    overflow:hidden;
+    margin-bottom:25px;
+}
+
+.progress{
+    width:100%;
+    height:100%;
+    background:#38bdf8;
+}
+
+/* GAME FRAME */
+
+.game-frame{
+    background:#0f172a;
+    border:5px solid #38bdf8;
+    border-radius:35px;
+    padding:20px;
+    box-shadow:
+    0 0 15px #38bdf8,
+    0 0 30px #38bdf8,
+    0 0 60px #0ea5e9;
+}
+
+/* SENTENCE BOX */
+
+.quote{
+    background:#162338;
+    border:2px solid #38bdf8;
+    border-radius:20px;
+    padding:20px;
+    font-size:22px;
+    line-height:1.6;
+    margin-bottom:15px;
+}
+
+/* TEXTAREA */
+
+textarea{
+    width:100%;
+    height:180px;
+    border:none;
+    outline:none;
+    resize:none;
+    border-radius:20px;
+    padding:15px;
+    font-size:18px;
+    background:white;
+    color:black;
+}
+
+/* BUTTON */
+
+button{
+    width:100%;
+    margin-top:15px;
+    padding:15px;
+    border:none;
+    border-radius:15px;
+    background:#0ea5e9;
+    color:white;
+    font-size:18px;
+    font-weight:bold;
+    cursor:pointer;
+}
+
+button:hover{
+    transform:scale(1.02);
+}
+
+/* MOBILE */
+
+@media(max-width:600px){
+    h1{font-size:1.8rem;}
+    .quote{font-size:18px;}
+    .stat-box p{font-size:22px;}
+    textarea{height:150px;}
+}
+#startScreen{
+    position:fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    z-index:9999;
+}
+
+</style>
+</head>
+
+<body>
+    <div id="startScreen" style="
+    position:fixed;
+    top:0;left:0;
+    width:100%;height:100%;
+    background:#081120;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    color:white;
+    text-align:center;
+    z-index:999;
+">
+
+    <h1 style="
+        font-size:3rem;
+        color:#38bdf8;
+        text-shadow:0 0 10px #38bdf8, 0 0 25px #0ea5e9;
+    ">
+        ⚡ JAY SPEED TYPE
+    </h1>
+
+    <p style="max-width:300px; margin:20px;">
+        📌 How to play:<br>
+        • Type the sentence correctly<br>
+        • Get +25 score each correct answer<br>
+        • Beat your WPM 🔥
+    </p>
+
+    <button onclick="startGameFromMenu()" style="
+        padding:15px 25px;
+        font-size:18px;
+        border:none;
+        border-radius:12px;
+        background:#0ea5e9;
+        color:white;
+        cursor:pointer;
+    ">
+        ▶ PLAY GAME
+    </button>
+
+</div>
+
+<div class="container">
+
+    <h1>⚡ CAN YOU TYPE FASTER THAN 99% OF PEOPLE?</h1>
+
+    <p class="subtitle">
+        Beat the clock and prove your typing skills!
+    </p>
+
+    <!-- ✅ STATS FIXED -->
+    <div class="stats">
+
+        <div class="stat-box">
+            <h3>SCORE</h3>
+            <p id="score">0</p>
+        </div>
+
+        <div class="stat-box">
+            <h3>BEST</h3>
+            <p id="best">0</p>
+        </div>
+
+        <div class="stat-box">
+            <h3>WPM</h3>
+            <p id="wpm">0</p>
+        </div>
+
+        <div class="stat-box">
+            <h3>ACCURACY</h3>
+            <p id="accuracy">100%</p>
+        </div>
+
+    </div>
+
+    <div class="timer">
+        ⏰ Time: 60
+    </div>
+
+    <div class="progress-bg">
+        <div class="progress"></div>
+    </div>
+
+    <div class="game-frame">
+
+        <div class="quote">
+            Press START GAME to begin your typing challenge.
+        </div>
+
+        <textarea placeholder="Start typing here..."></textarea>
+
+    </div>
+
+    <button>START GAME</button>
+
+</div>
+<script>
+    
+
+let time = 60;
+let score = 0;
+let totalTyped = 0;
+let correctTyped = 0;
+let isPlaying = false;
+let timer;
+
+const quotes = [
+"Practice makes perfect.",
+"Never give up.",
+"Focus and keep typing.",
+"Small steps lead to success.",
+"Work hard stay humble.",
+"Believe in yourself.",
+"Keep moving forward.",
+"Success needs patience."
+];
+
+const quoteEl = document.querySelector(".quote");
+const textarea = document.querySelector("textarea");
+const button = document.querySelector("button");
+const timerEl = document.querySelector(".timer");
+
+const scoreEl = document.getElementById("score");
+const bestEl = document.getElementById("best");
+const wpmEl = document.getElementById("wpm");
+const accEl = document.getElementById("accuracy");
+
+let best = localStorage.getItem("bestScore") || 0;
+bestEl.textContent = best;
+
+let currentQuote = "";
+let showJay = false;
+function updateStats(){
+
+    let minutes = (60 - time) / 60;
+
+    let wpm = minutes > 0
+        ? Math.round((correctTyped / 5) / minutes)
+        : 0;
+
+    let accuracy = totalTyped > 0
+        ? Math.round((correctTyped / totalTyped) * 100)
+        : 100;
+
+    document.getElementById("wpm").textContent = wpm;
+    document.getElementById("accuracy").textContent = accuracy + "%";
+}
+
+// ambil kalimat random
+function newQuote(){
+
+    if(showJay){
+        currentQuote = "JAY NETWORK";
+    } else {
+        currentQuote = quotes[Math.floor(Math.random() * quotes.length)];
+    }
+
+    quoteEl.textContent = currentQuote;
+
+    showJay = !showJay;
+}
+
+// start game
+function startGame(){
+    clearInterval(timer);
+
+    score = 0;
+    time = 60;
+    totalTyped = 0;
+correctTyped = 0;
+
+document.getElementById("wpm").textContent = 0;
+document.getElementById("accuracy").textContent = "100%";
+    isPlaying = true;
+
+    scoreEl.textContent = score;
+    textarea.value = "";
+
+    newQuote();
+
+    
+timer = setInterval(() => {
+
+    if(!isPlaying) return;
+
+    time--;
+
+    timerEl.textContent = "⏰ Time: " + time;
+    updateStats();
+
+    if(time <= 0){
+        clearInterval(timer);
+        isPlaying = false;
+
+        popup.style.display = "flex";
+
+        finalScore.textContent = "Score: " + score;
+        finalWPM.textContent = "WPM: " + document.getElementById("wpm").textContent;
+        finalAcc.textContent = "Accuracy: " + document.getElementById("accuracy").textContent;
+        finalBest.textContent = "Best: " + best;
+    }
+
+}, 1000);
+        
+}
+
+// tombol start
+button.addEventListener("click", startGame);
+
+// cek typing
+textarea.addEventListener("input", () => {
+
+    if(!isPlaying) return;
+
+    totalTyped++;
+
+    let typed = textarea.value.trim().toLowerCase();
+    let target = currentQuote.trim().toLowerCase();
+
+    if(target.startsWith(typed)){
+    correctTyped++;
+}
+
+    if(typed === target){
+
+        score += 25;
+        scoreEl.textContent = score;
+
+        if(score > best){
+            best = score;
+            bestEl.textContent = best;
+            localStorage.setItem("bestScore", best);
+        }
+
+        textarea.value = "";
+        newQuote();
+    }
+
+});
+function startGameFromMenu(){
+    document.getElementById("startScreen").style.display = "none";
+    startGame();
+}
+</script>
+<div id="popup" style="
+    display:none;
+    position:fixed;
+    top:0;left:0;
+    width:100%;height:100%;
+    background:rgba(0,0,0,0.7);
+    justify-content:center;
+    align-items:center;
+">
+
+       <div style="
+    background:#0f172a;
+    padding:40px;
+    border-radius:25px;
+    text-align:center;
+    color:white;
+    width:400px;
+    max-width:90%;
+    border:2px solid #38bdf8;
+    box-shadow:0 0 20px #38bdf8;
+    font-size:18px;
+">
+        <h2>Game Over</h2>
+
+        <p id="finalScore"></p>
+        <p id="finalWPM"></p>
+        <p id="finalAcc"></p>
+        <p id="finalBest"></p>
+
+        <button onclick="location.reload()">Play Again</button>
+
+    </div>
+
+</div>
+
+</body>
+</html>
