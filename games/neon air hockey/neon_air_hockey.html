@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neon Air Hockey 3D - Pro Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0; overflow: hidden; background-color: #050510;
+            font-family: 'Rajdhani', sans-serif; user-select: none; touch-action: none;
+            -webkit-touch-callout: none;
+        }
+        canvas { display: block; position: absolute; top: 0; left: 0; z-index: 1; outline: none; }
+
+        /* --- UI OVERLAY --- */
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 50; background: radial-gradient(circle, rgba(10,5,30,0.85) 0%, rgba(0,0,0,0.98) 100%);
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            transition: opacity 0.4s ease;
+        }
+
+        .title {
+            font-size: clamp(35px, 8vw, 100px); color: #00f2ff; text-transform: uppercase; letter-spacing: 5px;
+            text-shadow: 0 0 20px rgba(0, 242, 255, 0.8), 0 0 40px rgba(0, 242, 255, 0.4);
+            margin: 0 0 10px 0; font-weight: 900; text-align: center; line-height: 1.1;
+        }
+
+        .subtitle {
+            color: #ff0055; font-size: clamp(14px, 3vw, 24px); letter-spacing: 6px;
+            text-shadow: 0 0 10px rgba(255, 0, 85, 0.8); margin-bottom: 30px; font-weight: 700; text-align: center;
+        }
+
+        /* INSTRUCTION PANEL */
+        .info-panel {
+            background: rgba(0, 20, 40, 0.6); border: 1px solid rgba(0, 242, 255, 0.4);
+            border-radius: 16px; padding: 20px 30px; max-width: 600px; width: 80%;
+            box-shadow: inset 0 0 30px rgba(0, 242, 255, 0.1), 0 15px 30px rgba(0,0,0,0.8);
+            margin-bottom: 30px; position: relative; overflow: hidden;
+        }
+        .info-panel::before {
+            content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+            background: linear-gradient(to right, transparent, rgba(0, 242, 255, 0.1), transparent);
+            transform: skewX(-25deg); animation: shine 3s infinite;
+        }
+        @keyframes shine { 0% { left: -100%; } 20% { left: 200%; } 100% { left: 200%; } }
+
+        .info-title { color: #fff; font-size: clamp(18px, 4vw, 24px); margin-top: 0; text-align: center; letter-spacing: 2px; }
+        .info-list { color: #b0c4de; font-size: clamp(12px, 3vw, 16px); line-height: 1.6; margin-bottom: 0; padding-left: 20px;}
+        .info-list li { margin-bottom: 8px; }
+        .highlight-cyan { color: #00f2ff; font-weight: bold; text-shadow: 0 0 5px rgba(0,242,255,0.5);}
+        .highlight-pink { color: #ff0055; font-weight: bold; text-shadow: 0 0 5px rgba(255,0,85,0.5);}
+
+        .btn-play {
+            padding: 15px 50px; font-size: clamp(20px, 5vw, 28px); background: transparent;
+            color: #fff; border: 2px solid #00f2ff; border-radius: 50px;
+            cursor: pointer; font-family: inherit; font-weight: 900; letter-spacing: 3px;
+            box-shadow: 0 0 20px rgba(0, 242, 255, 0.3), inset 0 0 15px rgba(0, 242, 255, 0.2);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); text-transform: uppercase;
+        }
+        .btn-play:hover { background: rgba(0, 242, 255, 0.2); box-shadow: 0 0 30px rgba(0, 242, 255, 0.6), inset 0 0 20px rgba(0, 242, 255, 0.4); transform: translateY(-2px); }
+        .btn-play:active { transform: scale(0.95); background: #00f2ff; color: #000; }
+
+        /* HUD */
+        #hud {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100px;
+            display: none; justify-content: center; align-items: flex-start; z-index: 20;
+            pointer-events: none; padding-top: 15px;
+            background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, transparent 100%);
+        }
+        
+        .score-board {
+            display: flex; align-items: center; background: rgba(10, 15, 30, 0.8);
+            border: 2px solid rgba(0, 242, 255, 0.3); border-radius: 15px;
+            padding: 5px 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            backdrop-filter: blur(5px);
+        }
+
+        .score { font-size: clamp(30px, 8vw, 50px); font-weight: 900; line-height: 1; width: 50px; text-align: center;}
+        #score-player { color: #00f2ff; text-shadow: 0 0 20px #00f2ff; }
+        #score-ai { color: #ff0055; text-shadow: 0 0 20px #ff0055; }
+        .score-divider { color: #555; font-size: clamp(20px, 5vw, 30px); margin: 0 15px; font-weight: 700; }
+
+        #target-score-info {
+            position: absolute; top: 75px; width: 100%; text-align: center;
+            color: rgba(255,255,255,0.6); font-size: clamp(10px, 3vw, 14px); letter-spacing: 3px; font-weight: bold;
+        }
+
+        /* TOMBOL REFRESH PUCK */
+        #btn-reset-puck {
+            position: absolute; top: 20px; right: 20px;
+            padding: 8px 15px; background: rgba(0, 242, 255, 0.1);
+            color: #00f2ff; border: 1px solid rgba(0, 242, 255, 0.5);
+            border-radius: 6px; cursor: pointer; font-family: inherit;
+            font-weight: bold; font-size: clamp(10px, 2.5vw, 14px);
+            pointer-events: auto;
+            box-shadow: 0 0 10px rgba(0, 242, 255, 0.2);
+            transition: all 0.2s; z-index: 30;
+        }
+        #btn-reset-puck:active { background: #00f2ff; color: #000; transform: scale(0.9); }
+
+        #goal-alert {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.5);
+            font-size: clamp(50px, 12vw, 120px); color: #fff; font-weight: 900;
+            text-transform: uppercase; letter-spacing: 5px; z-index: 30;
+            opacity: 0; pointer-events: none; text-shadow: 0 0 40px #fff;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-align: center; width: 100%; line-height: 1;
+        }
+        .goal-show { opacity: 1 !important; transform: translate(-50%, -50%) scale(1) !important; }
+
+        .hidden { display: none !important; opacity: 0; pointer-events: none; }
+        
+        #pause-indicator {
+            position: absolute; top: 20px; left: 20px; color: #fff; font-size: 20px;
+            font-weight: bold; letter-spacing: 2px; text-shadow: 0 0 10px #fff; display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="intro-screen" class="overlay">
+        <h1 class="title">Neon Air Hockey</h1>
+        <p class="subtitle">CYBER ARENA</p>
+
+        <div class="info-panel">
+            <h3 class="info-title">MISSION BRIEFING</h3>
+            <ul class="info-list">
+                <li><span class="highlight-cyan">CONTROLS:</span> Touch and drag on the screen (or use your mouse) to move your Mallet.</li>
+                <li><span class="highlight-pink">OBJECTIVE:</span> Smash the puck into the AI's glowing red goal.</li>
+                <li><span class="highlight-cyan">DEFENSE:</span> Protect your cyan goal zone at the bottom.</li>
+                <li>First player to score <strong style="color: #ffcc00; font-size:16px;">10 POINTS</strong> wins!</li>
+            </ul>
+        </div>
+
+        <button class="btn-play" id="btn-start">START MATCH</button>
+    </div>
+
+    <div id="countdown-screen" class="overlay hidden" style="background: rgba(0,0,0,0.8);">
+        <h1 id="countdown-text" style="font-size: clamp(100px, 25vw, 150px); color: #00f2ff; font-weight: 900; text-shadow: 0 0 50px #00f2ff; margin:0;">3</h1>
+    </div>
+
+    <div id="hud">
+        <div id="pause-indicator">PAUSED</div>
+        <div class="score-board">
+            <div class="score" id="score-player">0</div>
+            <div class="score-divider">-</div>
+            <div class="score" id="score-ai">0</div>
+        </div>
+        <div id="target-score-info">FIRST TO 10 WINS</div>
+        
+        <button id="btn-reset-puck">⟳ REFRESH PUCK</button>
+    </div>
+
+    <div id="goal-alert">GOAL!</div>
+
+    <div id="end-screen" class="overlay hidden">
+        <h1 class="title" id="end-title" style="margin-bottom: 20px;">MISSION ACCOMPLISHED</h1>
+        <p class="subtitle" id="end-subtitle" style="color: #fff; margin-bottom: 50px;">FINAL SCORE: 10 - 4</p>
+        <button class="btn-play" id="btn-restart">PLAY AGAIN</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // --- WEB AUDIO API: SYNTHESIZER ---
+        class AudioManager {
+            constructor() {
+                this.ctx = null;
+                this.isInitialized = false;
+            }
+
+            init() {
+                if (!this.isInitialized) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    this.isInitialized = true;
+                }
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+            }
+
+            playHit() {
+                if(!this.isInitialized || this.ctx.state === 'suspended') return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.1);
+                } catch(e){}
+            }
+
+            playWallHit() {
+                if(!this.isInitialized || this.ctx.state === 'suspended') return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.1);
+                } catch(e){}
+            }
+
+            playGoal(isPlayer) {
+                if(!this.isInitialized || this.ctx.state === 'suspended') return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    if (isPlayer) {
+                        osc.frequency.setValueAtTime(440, this.ctx.currentTime);
+                        osc.frequency.linearRampToValueAtTime(880, this.ctx.currentTime + 0.5);
+                    } else {
+                        osc.frequency.setValueAtTime(440, this.ctx.currentTime);
+                        osc.frequency.linearRampToValueAtTime(110, this.ctx.currentTime + 0.8);
+                    }
+                    gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.8);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.8);
+                } catch(e){}
+            }
+        }
+
+        // --- GAME ENGINE ---
+        class AirHockey3D {
+            constructor() {
+                this.state = 'INTRO'; // INTRO, INITIAL_COUNTDOWN, PLAYING, GOAL, END, PAUSE
+                this.scores = { player: 0, ai: 0 };
+                this.maxScore = 10;
+
+                // Physics Constants
+                this.tableWidth = 60;
+                this.tableLength = 100;
+                this.goalWidth = 24;
+                this.puckRadius = 2.5;
+                this.paddleRadius = 4.5;
+                this.maxPuckSpeed = 220;
+                
+                this.aiBaseSpeed = 50.0;
+                
+                // Entities
+                this.puck = { pos: new THREE.Vector3(0, 0, 0), vel: new THREE.Vector3(0, 0, 0), mesh: null };
+                this.player = { pos: new THREE.Vector3(0, 0, 30), vel: new THREE.Vector3(0, 0, 0), mesh: null };
+                this.ai = { pos: new THREE.Vector3(0, 0, -30), vel: new THREE.Vector3(0, 0, 0), mesh: null };
+                this.aiState = 'RETURN';
+                
+                // Trail and Particles
+                this.trail = [];
+                this.particles = [];
+
+                // Interaction
+                this.mouse = new THREE.Vector2();
+                this.raycaster = new THREE.Raycaster();
+                this.plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); 
+                this.targetPos = new THREE.Vector3(0,0,30); 
+                this.isInteracting = false;
+
+                // Effects
+                this.cameraShakeTime = 0;
+                this.audio = new AudioManager();
+
+                this.initThree();
+                this.setupLighting(); 
+                this.createTable();
+                this.createPuckAndPaddles();
+                this.bindEvents();
+
+                this.clock = new THREE.Clock();
+                this.animate = this.animate.bind(this);
+                this.animate();
+            }
+
+            initThree() {
+                this.scene = new THREE.Scene();
+                this.scene.fog = new THREE.FogExp2(0x050510, 0.005);
+
+                const aspect = window.innerWidth / window.innerHeight;
+                const fov = aspect < 1 ? 65 : 45; 
+                this.camera = new THREE.PerspectiveCamera(fov, aspect, 0.1, 1000);
+                
+                const camY = aspect < 1 ? 130 : 85;
+                const camZ = aspect < 1 ? 120 : 95;
+                
+                this.cameraBasePos = new THREE.Vector3(0, camY, camZ);
+                this.camera.position.copy(this.cameraBasePos);
+                this.camera.lookAt(0, -10, 0);
+
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+                
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.renderer.toneMappingExposure = 1.3;
+                
+                document.body.appendChild(this.renderer.domElement);
+
+                window.addEventListener('resize', () => {
+                    const newAspect = window.innerWidth / window.innerHeight;
+                    this.camera.aspect = newAspect;
+                    this.camera.fov = newAspect < 1 ? 65 : 45;
+                    
+                    this.cameraBasePos.y = newAspect < 1 ? 130 : 85;
+                    this.cameraBasePos.z = newAspect < 1 ? 120 : 95;
+                    
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            }
+
+            setupLighting() {
+                const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+                this.scene.add(ambient);
+
+                const spotLight = new THREE.SpotLight(0xffffff, 1.2);
+                spotLight.position.set(0, 80, 0);
+                spotLight.angle = Math.PI / 3;
+                spotLight.penumbra = 0.5;
+                spotLight.castShadow = true;
+                spotLight.shadow.mapSize.width = 2048;
+                spotLight.shadow.mapSize.height = 2048;
+                this.scene.add(spotLight);
+
+                const lightP1 = new THREE.PointLight(0x00f2ff, 1, 100);
+                lightP1.position.set(0, 5, 50);
+                this.scene.add(lightP1);
+
+                const lightAI = new THREE.PointLight(0xff0055, 1, 100);
+                lightAI.position.set(0, 5, -50);
+                this.scene.add(lightAI);
+
+                this.puckLight = new THREE.PointLight(0xffffff, 1, 30);
+                this.scene.add(this.puckLight);
+            }
+
+            createTable() {
+                const tableGeo = new THREE.BoxGeometry(this.tableWidth, 2, this.tableLength);
+                const tableMat = new THREE.MeshStandardMaterial({ 
+                    color: 0x050a14, roughness: 0.1, metalness: 0.8
+                });
+                const table = new THREE.Mesh(tableGeo, tableMat);
+                table.position.y = -1;
+                table.receiveShadow = true;
+                this.scene.add(table);
+
+                const grid = new THREE.GridHelper(this.tableWidth, 10, 0x00f2ff, 0x112233);
+                grid.position.y = 0.01;
+                this.scene.add(grid);
+
+                const centerGeo = new THREE.PlaneGeometry(this.tableWidth, 1);
+                const centerMat = new THREE.MeshBasicMaterial({ color: 0x00f2ff, transparent: true, opacity: 0.5 });
+                const centerLine = new THREE.Mesh(centerGeo, centerMat);
+                centerLine.rotation.x = -Math.PI/2;
+                centerLine.position.y = 0.02;
+                this.scene.add(centerLine);
+
+                this.createWall(this.tableWidth/2 + 1, 0, 2, this.tableLength, 0x333333); 
+                this.createWall(-this.tableWidth/2 - 1, 0, 2, this.tableLength, 0x333333); 
+                
+                const wallW = (this.tableWidth - this.goalWidth) / 2;
+                this.createWall(this.tableWidth/2 - wallW/2, -this.tableLength/2, wallW, 2, 0xff0055); 
+                this.createWall(-this.tableWidth/2 + wallW/2, -this.tableLength/2, wallW, 2, 0xff0055); 
+                
+                this.createWall(this.tableWidth/2 - wallW/2, this.tableLength/2, wallW, 2, 0x00f2ff); 
+                this.createWall(-this.tableWidth/2 + wallW/2, this.tableLength/2, wallW, 2, 0x00f2ff); 
+
+                const goalGeo = new THREE.PlaneGeometry(this.goalWidth, 5);
+                const pGoal = new THREE.Mesh(goalGeo, new THREE.MeshBasicMaterial({color: 0x00f2ff}));
+                pGoal.rotation.x = -Math.PI/2; 
+                pGoal.position.set(0, 0.01, this.tableLength/2 + 2.5);
+                this.scene.add(pGoal);
+
+                const aiGoal = new THREE.Mesh(goalGeo, new THREE.MeshBasicMaterial({color: 0xff0055}));
+                aiGoal.rotation.x = -Math.PI/2; 
+                aiGoal.position.set(0, 0.01, -this.tableLength/2 - 2.5);
+                this.scene.add(aiGoal);
+            }
+
+            createWall(x, z, w, l, neonColor) {
+                const geo = new THREE.BoxGeometry(w, 4, l);
+                const mat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5 });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(x, 2, z);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                this.scene.add(mesh);
+
+                const neonGeo = new THREE.BoxGeometry(w * 0.9, 0.2, l * 0.9);
+                const neonMat = new THREE.MeshBasicMaterial({ color: neonColor });
+                const neon = new THREE.Mesh(neonGeo, neonMat);
+                neon.position.set(x, 4.1, z);
+                this.scene.add(neon);
+            }
+
+            createPuckAndPaddles() {
+                const puckGeo = new THREE.CylinderGeometry(this.puckRadius, this.puckRadius, 1.5, 32);
+                const puckMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.2, roughness: 0.1 });
+                this.puck.mesh = new THREE.Mesh(puckGeo, puckMat);
+                this.puck.mesh.position.y = 0.75;
+                this.puck.mesh.castShadow = true;
+                this.scene.add(this.puck.mesh);
+                
+                const trailGeo = new THREE.BufferGeometry();
+                const trailMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
+                this.trailLine = new THREE.Line(trailGeo, trailMat);
+                this.scene.add(this.trailLine);
+
+                const paddleGeo = new THREE.CylinderGeometry(this.paddleRadius, this.paddleRadius * 1.2, 3, 32);
+                
+                const pMat = new THREE.MeshStandardMaterial({ color: 0x00f2ff, metalness: 0.5, roughness: 0.2 });
+                this.player.mesh = new THREE.Mesh(paddleGeo, pMat);
+                this.player.mesh.position.y = 1.5;
+                this.player.mesh.castShadow = true;
+                
+                const handleGeo = new THREE.CylinderGeometry(1.5, 1.5, 4, 16);
+                const pHandle = new THREE.Mesh(handleGeo, pMat);
+                pHandle.position.y = 3;
+                this.player.mesh.add(pHandle);
+                this.scene.add(this.player.mesh);
+
+                const aiMat = new THREE.MeshStandardMaterial({ color: 0xff0055, metalness: 0.5, roughness: 0.2 });
+                this.ai.mesh = new THREE.Mesh(paddleGeo, aiMat);
+                this.ai.mesh.position.y = 1.5;
+                this.ai.mesh.castShadow = true;
+                
+                const aiHandle = new THREE.Mesh(handleGeo, aiMat);
+                aiHandle.position.y = 3;
+                this.ai.mesh.add(aiHandle);
+                this.scene.add(this.ai.mesh);
+
+                this.resetPositions();
+            }
+
+            bindEvents() {
+                const btnStart = document.getElementById('btn-start');
+                const btnRestart = document.getElementById('btn-restart');
+                const btnResetPuck = document.getElementById('btn-reset-puck');
+                
+                btnStart.addEventListener('click', () => {
+                    this.audio.init(); 
+                    document.getElementById('intro-screen').classList.add('hidden');
+                    this.startInitialCountdown(); 
+                });
+
+                btnRestart.addEventListener('click', () => {
+                    document.getElementById('end-screen').classList.add('hidden');
+                    this.scores.player = 0;
+                    this.scores.ai = 0;
+                    document.getElementById('score-player').innerText = '0';
+                    document.getElementById('score-ai').innerText = '0';
+                    this.startInitialCountdown();
+                });
+
+                btnResetPuck.addEventListener('click', () => {
+                    if (this.state !== 'PLAYING') return;
+
+                    this.puck.pos.set(0,0,0);
+                    this.puck.vel.set(0,0,0);
+                    
+                    this.trail.length = 0;
+                    if (this.trailLine) this.trailLine.geometry.setFromPoints([]);
+
+                    this.syncMeshes();
+                    this.audio.playWallHit();
+                });
+
+                const onPointerMove = (e) => {
+                    if (this.state !== 'PLAYING') return;
+                    this.isInteracting = true;
+                    this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                    this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                };
+
+                this.renderer.domElement.addEventListener('pointermove', onPointerMove);
+                this.renderer.domElement.addEventListener('pointerdown', onPointerMove);
+                this.renderer.domElement.addEventListener('pointerup', () => { this.isInteracting = false; });
+                this.renderer.domElement.addEventListener('pointerleave', () => { this.isInteracting = false; });
+                
+                this.renderer.domElement.addEventListener('pointercancel', () => { this.isInteracting = false; });
+                this.renderer.domElement.addEventListener('touchcancel', () => { this.isInteracting = false; });
+                
+                document.addEventListener('visibilitychange', () => {
+                    if (document.hidden) {
+                        if (this.state === 'PLAYING') {
+                            this.state = 'PAUSE';
+                            document.getElementById('pause-indicator').style.display = 'block';
+                        }
+                    } else if (this.state === 'PAUSE') {
+                        this.state = 'PLAYING';
+                        document.getElementById('pause-indicator').style.display = 'none';
+                    }
+                });
+            }
+
+            startInitialCountdown() {
+                this.state = 'INITIAL_COUNTDOWN';
+                this.resetPositions();
+                
+                const countScreen = document.getElementById('countdown-screen');
+                const countText = document.getElementById('countdown-text');
+                countScreen.classList.remove('hidden');
+                countScreen.style.display = 'flex';
+                
+                let count = 3;
+                countText.innerText = count;
+                this.audio.playWallHit();
+
+                const timer = setInterval(() => {
+                    count--;
+                    if (count > 0) {
+                        countText.innerText = count;
+                        this.audio.playWallHit();
+                    } else if (count === 0) {
+                        countText.innerText = "ENGAGE!";
+                        this.audio.playHit();
+                    } else {
+                        clearInterval(timer);
+                        countScreen.classList.add('hidden');
+                        document.getElementById('hud').style.display = 'flex';
+                        this.state = 'PLAYING';
+                    }
+                }, 1000);
+            }
+
+            resetPositions() {
+                this.puck.pos.set(0, 0, 0);
+                this.puck.vel.set(0, 0, 0);
+                this.player.pos.set(0, 0, this.tableLength/3);
+                this.player.vel.set(0, 0, 0);
+                this.ai.pos.set(0, 0, -this.tableLength/3);
+                this.ai.vel.set(0, 0, 0);
+                this.aiState = 'RETURN';
+                
+                this.targetPos.copy(this.player.pos); 
+                
+                this.trail.length = 0;
+                if (this.trailLine) this.trailLine.geometry.setFromPoints([]);
+                this.syncMeshes();
+            }
+
+            createExplosion(position, colorHex) {
+                const particleCount = 100;
+                const geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(particleCount * 3);
+                const velocities = [];
+
+                for (let i = 0; i < particleCount; i++) {
+                    positions[i * 3] = position.x;
+                    positions[i * 3 + 1] = position.y;
+                    positions[i * 3 + 2] = position.z;
+
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = Math.random() * 60 + 20;
+                    velocities.push({
+                        x: Math.cos(angle) * speed,
+                        y: Math.random() * 20 + 10,
+                        z: Math.sin(angle) * speed
+                    });
+                }
+
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                const material = new THREE.PointsMaterial({
+                    color: colorHex, size: 1.5, transparent: true, opacity: 1, blending: THREE.AdditiveBlending
+                });
+
+                const points = new THREE.Points(geometry, material);
+                this.scene.add(points);
+                this.particles.push({ mesh: points, velocities: velocities, life: 1.0 });
+            }
+
+            triggerGoal(scorer) {
+                if (this.state === 'GOAL' || this.state === 'END') {
+                    return;
+                }
+                
+                this.state = 'GOAL';
+                this.audio.playGoal(scorer === 'player');
+                this.cameraShakeTime = 0.5;
+                
+                const pColor = scorer === 'player' ? 0x00f2ff : 0xff0055;
+                this.createExplosion(this.puck.pos.clone(), pColor);
+
+                document.getElementById('end-screen').style.backgroundColor = scorer === 'player' ? 'rgba(0, 242, 255, 0.3)' : 'rgba(255, 0, 85, 0.3)';
+
+                if (scorer === 'player') this.scores.player++;
+                else this.scores.ai++;
+
+                document.getElementById('score-player').innerText = this.scores.player;
+                document.getElementById('score-ai').innerText = this.scores.ai;
+
+                const alertBox = document.getElementById('goal-alert');
+                
+                if (scorer === 'player') {
+                    alertBox.innerHTML = "GOAL!<br><span style='font-size:clamp(16px, 4vw, 30px); letter-spacing:3px;'>PLAYER SCORED</span>";
+                    alertBox.style.color = "#00f2ff";
+                    alertBox.style.textShadow = "0 0 40px #00f2ff";
+                } else {
+                    alertBox.innerHTML = "BREACH!<br><span style='font-size:clamp(16px, 4vw, 30px); letter-spacing:3px;'>OPPONENT SCORED</span>";
+                    alertBox.style.color = "#ff0055";
+                    alertBox.style.textShadow = "0 0 40px #ff0055";
+                }
+                
+                alertBox.classList.add('goal-show');
+
+                if (this.scores.player >= this.maxScore || this.scores.ai >= this.maxScore) {
+                    setTimeout(() => {
+                        alertBox.classList.remove('goal-show');
+                        this.endGame();
+                    }, 2000);
+                } else {
+                    setTimeout(() => {
+                        alertBox.classList.remove('goal-show');
+                        this.resetPositions();
+                        this.puck.vel.z = scorer === 'player' ? -60 : 60; 
+                        this.state = 'PLAYING';
+                    }, 2000);
+                }
+            }
+
+            endGame() {
+                this.state = 'END';
+                document.getElementById('hud').style.display = 'none';
+                
+                const endScreen = document.getElementById('end-screen');
+                endScreen.classList.remove('hidden');
+                endScreen.style.backgroundColor = "transparent";
+
+                const title = document.getElementById('end-title');
+                const sub = document.getElementById('end-subtitle');
+
+                if (this.scores.player >= this.maxScore) {
+                    title.innerText = "MISSION ACCOMPLISHED";
+                    title.style.color = "#00f2ff";
+                    title.style.textShadow = "0 0 30px #00f2ff";
+                } else {
+                    title.innerText = "MISSION FAILED";
+                    title.style.color = "#ff0055";
+                    title.style.textShadow = "0 0 30px #ff0055";
+                }
+                sub.innerText = `FINAL SCORE: ${this.scores.player} - ${this.scores.ai}`;
+            }
+
+            updatePhysics(dt) {
+                if (this.isInteracting) {
+                    this.raycaster.setFromCamera(this.mouse, this.camera);
+                    const intersectPoint = new THREE.Vector3();
+                    if (this.raycaster.ray.intersectPlane(this.plane, intersectPoint)) {
+                        this.targetPos.copy(intersectPoint);
+                    }
+                }
+
+                const pLimitX = this.tableWidth/2 - this.paddleRadius;
+                const pLimitZMin = this.paddleRadius; 
+                const pLimitZMax = this.tableLength/2 - this.paddleRadius; 
+
+                let tx = Math.max(-pLimitX, Math.min(pLimitX, this.targetPos.x));
+                let tz = Math.max(pLimitZMin, Math.min(pLimitZMax, this.targetPos.z));
+
+                const prevX = this.player.pos.x;
+                const prevZ = this.player.pos.z;
+
+                this.player.pos.x += (tx - this.player.pos.x) * 20 * dt;
+                this.player.pos.z += (tz - this.player.pos.z) * 20 * dt;
+
+                this.player.vel.x = (this.player.pos.x - prevX) / dt;
+                this.player.vel.z = (this.player.pos.z - prevZ) / dt;
+
+                let aiSpeed = this.aiBaseSpeed;
+                let aiTargetX = 0;
+                let aiTargetZ = -this.tableLength/4;
+
+                let predictedPuckX = this.puck.pos.x + (this.puck.vel.x * 0.3);
+                predictedPuckX = Math.max(-pLimitX, Math.min(pLimitX, predictedPuckX));
+
+                if (this.puck.pos.z < 0) { 
+                    if (this.puck.vel.z < -10) {
+                        this.aiState = 'DEFEND';
+                        aiTargetX = predictedPuckX;
+                        aiTargetZ = this.puck.pos.z - 8;
+                        aiSpeed = this.aiBaseSpeed * 1.5; 
+                    } else {
+                        this.aiState = 'ATTACK';
+                        aiTargetX = this.puck.pos.x;
+                        aiTargetZ = this.puck.pos.z - 5;
+                        
+                        if (Math.abs(this.ai.pos.z - this.puck.pos.z) < 8) {
+                            aiTargetZ = this.puck.pos.z + 15; 
+                            aiSpeed = this.aiBaseSpeed * 2.5; 
+                        }
+                    }
+                } else {
+                    this.aiState = 'RETURN';
+                    aiTargetX = predictedPuckX * 0.5; 
+                    aiTargetZ = -this.tableLength/4; 
+                    aiSpeed = this.aiBaseSpeed * 0.8; 
+                }
+
+                aiTargetX = Math.max(-pLimitX, Math.min(pLimitX, aiTargetX));
+                aiTargetZ = Math.max(-this.tableLength/2 + this.paddleRadius, Math.min(-this.paddleRadius, aiTargetZ));
+
+                const aiPrevX = this.ai.pos.x;
+                const aiPrevZ = this.ai.pos.z;
+
+                const aiDx = aiTargetX - this.ai.pos.x;
+                const aiDz = aiTargetZ - this.ai.pos.z;
+                const aiDist = Math.sqrt(aiDx*aiDx + aiDz*aiDz);
+                
+                if (aiDist > 0.1) {
+                    const moveDist = Math.min(aiSpeed * dt, aiDist);
+                    this.ai.pos.x += (aiDx / aiDist) * moveDist;
+                    this.ai.pos.z += (aiDz / aiDist) * moveDist;
+                }
+
+                this.ai.vel.x = (this.ai.pos.x - aiPrevX) / dt;
+                this.ai.vel.z = (this.ai.pos.z - aiPrevZ) / dt;
+
+                this.puck.pos.x += this.puck.vel.x * dt;
+                this.puck.pos.z += this.puck.vel.z * dt;
+
+                this.puck.vel.multiplyScalar(0.985); 
+
+                if (this.puck.vel.length() > this.maxPuckSpeed) {
+                    this.puck.vel.setLength(this.maxPuckSpeed);
+                }
+
+                this.checkWallCollision();
+                this.checkPaddleCollision(this.player);
+                this.checkPaddleCollision(this.ai);
+
+                if (this.puck.vel.length() < 2 && this.state === 'PLAYING') {
+                    const angle = Math.random() * Math.PI * 2;
+                    this.puck.vel.x += Math.cos(angle) * 20;
+                    this.puck.vel.z += Math.sin(angle) * 20;
+                }
+
+                const puckLimitX = this.tableWidth / 2 - this.puckRadius;
+                const puckLimitZ = this.tableLength / 2 - this.puckRadius;
+
+                this.puck.pos.x = THREE.MathUtils.clamp(
+                    this.puck.pos.x,
+                    -puckLimitX,
+                    puckLimitX
+                );
+
+                this.puck.pos.z = THREE.MathUtils.clamp(
+                    this.puck.pos.z,
+                    -puckLimitZ,
+                    puckLimitZ
+                );
+
+                this.syncMeshes();
+            }
+
+            checkWallCollision() {
+                const limitX = this.tableWidth/2 - this.puckRadius;
+                const limitZ = this.tableLength/2 - this.puckRadius;
+
+                if (this.puck.pos.x > limitX) {
+                    this.puck.pos.x = limitX;
+                    this.puck.vel.x *= -0.9;
+                    this.audio.playWallHit();
+                } else if (this.puck.pos.x < -limitX) {
+                    this.puck.pos.x = -limitX;
+                    this.puck.vel.x *= -0.9;
+                    this.audio.playWallHit();
+                }
+
+                if (this.state === "PLAYING" && Math.abs(this.puck.pos.z) > limitZ) {
+                    if (Math.abs(this.puck.pos.x) < this.goalWidth / 2) {
+                        if (this.puck.pos.z > 0) {
+                            this.triggerGoal('ai'); 
+                        } else {
+                            this.triggerGoal('player'); 
+                        }
+                    } else {
+                        if (this.puck.pos.z > limitZ) {
+                            this.puck.pos.z = limitZ;
+                            this.puck.vel.z *= -0.9;
+                            this.audio.playWallHit();
+                        } else if (this.puck.pos.z < -limitZ) {
+                            this.puck.pos.z = -limitZ;
+                            this.puck.vel.z *= -0.9;
+                            this.audio.playWallHit();
+                        }
+                    }
+                }
+            }
+
+            checkPaddleCollision(paddle) {
+                const dx = this.puck.pos.x - paddle.pos.x;
+                const dz = this.puck.pos.z - paddle.pos.z;
+                const distSq = dx*dx + dz*dz;
+                const minDist = this.puckRadius + this.paddleRadius;
+
+                if (distSq < minDist * minDist) {
+                    const dist = Math.sqrt(distSq);
+                    
+                    if (dist < 0.0001) {
+                        this.puck.pos.x += (Math.random() - 0.5);
+                        this.puck.pos.z += (Math.random() - 0.5);
+                        return;
+                    }
+
+                    const nx = dx / dist;
+                    const nz = dz / dist;
+
+                    const overlap = minDist - dist;
+                    this.puck.pos.x += nx * overlap;
+                    this.puck.pos.z += nz * overlap;
+                    
+                    // FIX PALING KUAT: Dorong puck keluar paddle secara absolut agar tidak nyangkut (tunneling/overlap besar)
+                    this.puck.pos.x = paddle.pos.x + nx * (minDist + 0.5);
+                    this.puck.pos.z = paddle.pos.z + nz * (minDist + 0.5);
+
+                    const rvx = this.puck.vel.x - paddle.vel.x;
+                    const rvz = this.puck.vel.z - paddle.vel.z;
+                    const velAlongNormal = rvx * nx + rvz * nz;
+
+                    if (velAlongNormal > 0) return;
+
+                    const e = 0.9; 
+                    const j = -(1 + e) * velAlongNormal;
+
+                    this.puck.vel.x += j * nx;
+                    this.puck.vel.z += j * nz;
+
+                    this.puck.vel.x += paddle.vel.x * 0.4;
+                    this.puck.vel.z += paddle.vel.z * 0.4;
+                    
+                    if (paddle.vel.length() > 120) {
+                        this.puck.vel.multiplyScalar(1.4);
+                    }
+
+                    this.audio.playHit();
+                    
+                    if (paddle === this.player && paddle.vel.length() > 20) {
+                        this.cameraShakeTime = 0.1; 
+                    }
+                }
+            }
+
+            syncMeshes() {
+                this.puck.mesh.position.x = this.puck.pos.x;
+                this.puck.mesh.position.z = this.puck.pos.z;
+                
+                if (this.puckLight) {
+                    this.puckLight.position.x = this.puck.pos.x;
+                    this.puckLight.position.z = this.puck.pos.z;
+                    this.puckLight.position.y = 1.5;
+                }
+
+                this.player.mesh.position.x = this.player.pos.x;
+                this.player.mesh.position.z = this.player.pos.z;
+
+                this.ai.mesh.position.x = this.ai.pos.x;
+                this.ai.mesh.position.z = this.ai.pos.z;
+                
+                if (this.state === 'PLAYING') {
+                    this.trail.push(new THREE.Vector3(this.puck.pos.x, 0.75, this.puck.pos.z));
+                    if (this.trail.length > 15) {
+                        this.trail.shift();
+                    }
+                    this.trailLine.geometry.setFromPoints(this.trail);
+                }
+            }
+
+            animate() {
+                requestAnimationFrame(this.animate);
+                
+                const dt = Math.max(0.001, Math.min(this.clock.getDelta(), 0.1)); 
+
+                if (this.state === 'PLAYING') {
+                    this.updatePhysics(dt);
+                } 
+                else if (this.state === 'INTRO') {
+                    this.camera.position.x = Math.sin(Date.now() * 0.0005) * 30;
+                    this.camera.position.z = this.cameraBasePos.z + Math.cos(Date.now() * 0.0005) * 15;
+                    this.camera.position.y = this.cameraBasePos.y - 20; 
+                    this.camera.lookAt(0,0,0);
+                } 
+                else if (this.state === 'INITIAL_COUNTDOWN') {
+                    this.camera.position.lerp(this.cameraBasePos, 0.05);
+                    const dummyCam = new THREE.PerspectiveCamera();
+                    dummyCam.position.copy(this.camera.position);
+                    dummyCam.lookAt(0, -10, 0); 
+                    this.camera.quaternion.slerp(dummyCam.quaternion, 0.1);
+                }
+
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.life -= dt * 1.5;
+                    if (p.life <= 0) {
+                        this.scene.remove(p.mesh);
+                        p.mesh.geometry.dispose();
+                        p.mesh.material.dispose();
+                        this.particles.splice(i, 1);
+                        continue;
+                    }
+                    p.mesh.material.opacity = p.life;
+                    const positions = p.mesh.geometry.attributes.position.array;
+                    for (let j = 0; j < p.velocities.length; j++) {
+                        positions[j * 3] += p.velocities[j].x * dt;
+                        positions[j * 3 + 1] += p.velocities[j].y * dt;
+                        positions[j * 3 + 2] += p.velocities[j].z * dt;
+                    }
+                    p.mesh.geometry.attributes.position.needsUpdate = true;
+                }
+
+                if (this.cameraShakeTime > 0) {
+                    this.cameraShakeTime -= dt;
+                    const magnitude = this.state === 'GOAL' ? 3.0 : 0.8;
+                    this.camera.position.x = this.cameraBasePos.x + (Math.random() - 0.5) * magnitude;
+                    this.camera.position.y = this.cameraBasePos.y + (Math.random() - 0.5) * magnitude;
+                    this.camera.position.z = this.cameraBasePos.z + (Math.random() - 0.5) * magnitude;
+                } else if (this.state === 'PLAYING' || this.state === 'GOAL') {
+                    const targetCamX = THREE.MathUtils.clamp(this.puck.pos.x * 0.1, -8, 8);
+                    this.camera.position.x += (targetCamX - this.camera.position.x) * 0.03;
+                    this.camera.position.y += (this.cameraBasePos.y - this.camera.position.y) * 0.1;
+                    this.camera.position.z += (this.cameraBasePos.z - this.camera.position.z) * 0.1;
+                    this.camera.lookAt(0, -10, 0); 
+                }
+
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new AirHockey3D();
+        });
+    </script>
+</body>
+</html>
