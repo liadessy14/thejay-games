@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sweet Crush</title>
+<style>
+body{margin:0;padding:10px;background:#0f172a;color:#fff;font-family:Arial;text-align:center}
+#hud{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}
+.box{background:#1e293b;padding:8px 12px;border-radius:10px}
+#progressWrap{width:min(90vw,420px);height:12px;background:#334155;margin:10px auto;border-radius:10px;overflow:hidden}
+#progress{height:100%;width:0%;background:#22c55e}
+#board{display:grid;grid-template-columns:repeat(8,42px);gap:3px;justify-content:center;margin:10px auto}
+.cell{width:42px;height:42px;background:#334155;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer}
+.selected{outline:3px solid gold}
+#msg{height:30px;font-weight:bold}
+#overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center}
+#popup{background:#1e293b;padding:20px;border-radius:12px}
+#particles{position:fixed;inset:0;pointer-events:none}
+.p{position:absolute;animation:boom .6s linear forwards}
+@keyframes boom{to{transform:translateY(-40px);opacity:0}}
+.shake{animation:shake .25s}
+@keyframes shake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+button{padding:10px 18px;border:none;border-radius:10px}
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
+#startScreen{position:fixed;inset:0;display:flex;justify-content:center;align-items:center;background:radial-gradient(circle at top,#1e1b4b,#0f172a);z-index:9999}
+.startCard{background:rgba(31,41,55,.8);padding:40px;border-radius:24px;max-width:520px;text-align:center;color:#fff;backdrop-filter:blur(12px)}
+.startCard h1{font-family:Poppins,sans-serif;font-size:3rem;margin:10px 0}
+.desc{font-family:Poppins,sans-serif;color:#cbd5e1;line-height:1.6}
+.startBtn{padding:15px 40px;border:none;border-radius:999px;background:linear-gradient(90deg,#ff6fb5,#ff8a65,#ffd166);box-shadow:0 6px 20px rgba(255,111,181,.45);color:#fff;font-weight:bold;cursor:pointer}
+body{background:radial-gradient(circle at top,#ffd6e7,#ff9ecf,#ff8a65)!important;font-family:Poppins,sans-serif!important}
+
+
+.bg span{
+position:absolute;font-size:40px;opacity:.15;
+animation:float 12s infinite ease-in-out;
+}
+@keyframes float{
+0%{transform:translateY(50px) rotate(0)}
+100%{transform:translateY(-100vh) rotate(360deg)}
+}
+#startScreen{
+position:fixed;inset:0;display:flex;justify-content:center;align-items:center;
+background:radial-gradient(circle at top,#ff9ecf,#ff6fb5,#ff8a65);
+z-index:9999;padding:20px
+}
+.startCard{
+max-width:600px;text-align:center;
+background:rgba(31,41,55,.65);
+backdrop-filter:blur(5px);
+padding:40px;border-radius:30px;
+box-shadow:0 10px 25px rgba(0,0,0,.25);
+border:1px solid rgba(255,255,255,.1);
+color:#fff
+}
+.startCard h1{
+font-size:4rem;
+font-weight:800;
+background:linear-gradient(90deg,#ff6fb5,#ff8a65,#ffd166);
+-webkit-background-clip:text;
+-webkit-text-fill-color:transparent;
+}
+.logoPremium{
+font-size:100px;
+filter:drop-shadow(0 0 8px #8b5cf6);
+animation:pulse 2s infinite;
+}
+@keyframes pulse{50%{transform:scale(1.08)}}
+
+
+.buttonGroup{
+display:flex;
+justify-content:center;
+gap:12px;
+flex-wrap:wrap;
+margin-top:10px;
+}
+.buttonGroup .startBtn{
+margin:0 !important;
+}
+
+</style>
+</head>
+<body>
+
+<div id="startScreen">
+<div class="bg">
+<span style="left:5%;top:90%">🍬</span>
+<span style="left:20%;top:80%">🍭</span>
+<span style="left:35%;top:95%">🍩</span>
+<span style="left:50%;top:85%">🧁</span>
+<span style="left:70%;top:90%">🍫</span>
+<span style="left:85%;top:80%">🍪</span>
+<span style="left:60%;top:75%">🍬</span>
+<span style="left:15%;top:60%">🍭</span>
+</div>
+ <div class="startCard">
+   <div class="logoPremium">🍭</div>
+   <h1>Sweet Crush</h1>
+   
+<p class="powered">🚀 Powered by Jay Network</p>
+
+<style>
+.powered{
+margin:-5px 0 18px;
+font-family:Poppins,sans-serif;
+font-weight:700;
+font-size:18px;
+letter-spacing:1px;
+background:linear-gradient(90deg,#60a5fa,#a78bfa,#22d3ee);
+-webkit-background-clip:text;
+-webkit-text-fill-color:transparent;
+text-shadow:none;
+}
+</style>
+
+<p class="desc">Match 3 or more candies to earn points. Create amazing combos, level up, and beat your high score before time runs out!</p>
+   <div class="buttonGroup">
+<button class="startBtn" onclick="startGame()">START GAME</button>
+<button class="startBtn" onclick="showHowToPlay()">HOW TO PLAY</button>
+</div>
+ </div>
+</div>
+
+<h2>🍭 Sweet Crush</h2>
+
+<div id="hud">
+<div class="box">Score <span id="score">0</span></div>
+<div class="box">High <span id="high">0</span></div>
+<div class="box">Level <span id="level">1</span></div>
+<div class="box">Time <span id="time">60</span></div>
+<div class="box">Combo <span id="combo">0</span></div>
+</div>
+
+<div id="progressWrap"><div id="progress"></div></div>
+<div style='margin:6px 0;font-size:14px'>Progress: <span id='levelProgressText'>0 / 500</span></div>
+<div id="msg"></div>
+<div id="board"></div>
+<div id="particles"></div>
+<div id="gameCandyBg" style="position:fixed;inset:0;pointer-events:none;z-index:-1;overflow:hidden">
+<span style="position:absolute;left:10%;top:20%;font-size:80px;opacity:.06;animation:float 18s infinite linear">🍭</span>
+<span style="position:absolute;left:75%;top:30%;font-size:90px;opacity:.05;animation:float 22s infinite linear">🍬</span>
+<span style="position:absolute;left:20%;top:70%;font-size:70px;opacity:.06;animation:float 20s infinite linear">🍩</span>
+<span style="position:absolute;left:80%;top:75%;font-size:85px;opacity:.05;animation:float 25s infinite linear">🧁</span>
+</div>
+
+
+<div id="overlay">
+ <div id="popup">
+  <h2>🎮 <span style="color:#ffffff;font-weight:900;letter-spacing:2px;text-shadow:0 0 12px rgba(255,255,255,.25)">Game Over</span></h2>
+  <div id="result"></div><br>
+  <button onclick="restart()" style="padding:12px 22px;border:none;border-radius:14px;background:linear-gradient(90deg,#ff6fb5,#ff8a65,#ffd166);box-shadow:0 6px 20px rgba(255,111,181,.45);color:white;font-weight:bold;cursor:pointer">▶ PLAY AGAIN</button>
+ </div>
+</div>
+
+
+<div id="levelOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:9998">
+ <div id="levelPopup" style="background:linear-gradient(135deg,#0f172a,#1e293b);padding:24px;border-radius:22px;text-align:center;max-width:380px;border:2px solid rgba(99,102,241,.7);box-shadow:0 0 25px rgba(99,102,241,.45),0 0 60px rgba(168,85,247,.25);color:#fff">
+  <h2>🏆 LEVEL COMPLETE</h2>
+  <div id="levelInfo"></div><br>
+  <button onclick="continueLevel()" style="padding:12px 22px;border:none;border-radius:14px;background:linear-gradient(90deg,#ff6fb5,#ff8a65,#ffd166);box-shadow:0 6px 20px rgba(255,111,181,.45);color:white;font-weight:bold;cursor:pointer">▶ LANJUT</button>
+ </div>
+</div>
+
+<script>
+const SIZE=8;
+const ICONS=[
+"https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f36c.png",
+"https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f36d.png",
+"https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f9c1.png",
+"https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f36b.png",
+"https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f369.png",
+"https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f36a.png"
+];
+let board=[],selected=null,score=0,level=1,time=60,combo=0,target=500,levelScore=0;
+let high=+(localStorage.getItem("m3_v141_high")||0);
+let timer,gameOver=false;
+
+const ctx=new(window.AudioContext||window.webkitAudioContext)();
+function sound(f,d=.08){
+ try{
+  if(ctx.state==="suspended"){
+     ctx.resume();
+  }
+
+  let o=ctx.createOscillator();
+  let g=ctx.createGain();
+
+  o.connect(g);
+  g.connect(ctx.destination);
+
+  o.frequency.value=f;
+
+  g.gain.setValueAtTime(0.08,ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+d);
+
+  o.start();
+  o.stop(ctx.currentTime+d);
+ }catch(e){}
+}
+
+
+function particle(x,y){
+ for(let i=0;i<6;i++){
+  let p=document.createElement("div");
+  p.className="p"; p.textContent="✨";
+  p.style.left=(x+(Math.random()*20-10))+"px";
+  p.style.top=y+"px";
+  particles.appendChild(p);
+  setTimeout(()=>p.remove(),600);
+ }
+}
+
+function rnd(){return ICONS[Math.floor(Math.random()*ICONS.length)]}
+
+
+function hasInitialMatch(){
+ return find().length>0;
+}
+
+function build(){
+ do{
+  board=[];
+  for(let r=0;r<SIZE;r++){
+   board[r]=[];
+   for(let c=0;c<SIZE;c++) board[r][c]=rnd();
+  }
+ }while(hasInitialMatch());
+}
+
+function draw(){
+ boardEl.innerHTML="";
+ for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++){
+  let d=document.createElement("div");
+  d.className="cell";
+  if(selected&&selected.r===r&&selected.c===c)d.classList.add("selected");
+  d.innerHTML=`<img src="${board[r][c]}" width="34" height="34" draggable="false">`;
+  d.onclick=()=>pick(r,c);
+  boardEl.appendChild(d);
+ }
+}
+
+function pick(r,c){
+ if(gameOver)return;
+ if(!selected){selected={r,c};draw();return;}
+ if(Math.abs(selected.r-r)+Math.abs(selected.c-c)!==1){selected={r,c};draw();return;}
+
+ [board[selected.r][selected.c],board[r][c]]=[board[r][c],board[selected.r][selected.c]];
+ if(find().length===0){
+  [board[selected.r][selected.c],board[r][c]]=[board[r][c],board[selected.r][selected.c]];
+ }else{
+  sound(450,.05);
+  resolve();
+ }
+ selected=null; draw();
+}
+
+function find(){
+ let s=new Set();
+ for(let r=0;r<SIZE;r++){
+  let run=1;
+  for(let c=1;c<=SIZE;c++){
+   if(c<SIZE&&board[r][c]===board[r][c-1])run++;
+   else{if(run>=3)for(let k=0;k<run;k++)s.add(r+","+(c-1-k));run=1;}
+  }
+ }
+ for(let c=0;c<SIZE;c++){
+  let run=1;
+  for(let r=1;r<=SIZE;r++){
+   if(r<SIZE&&board[r][c]===board[r-1][c])run++;
+   else{if(run>=3)for(let k=0;k<run;k++)s.add((r-1-k)+","+c);run=1;}
+  }
+ }
+ return [...s].map(v=>v.split(",").map(Number));
+}
+
+async function resolve(){
+ combo=0;
+ while(true){
+  let m=find();
+  if(!m.length){comboEl.textContent=0;return;}
+  combo++;
+  comboEl.textContent=combo;
+
+  if(combo==2){
+   msg.textContent="🔥 NICE!";
+   msg.style.color="#22c55e";
+   
+  }
+  else if(combo==3){
+   msg.textContent="⚡ GREAT!";
+   msg.style.color="#3b82f6";
+   
+   
+  }
+  else if(combo==4){
+   msg.textContent="👑 LEGENDARY!";
+   msg.style.color="#a855f7";
+   
+   
+   
+   boardEl.classList.add("shake");
+   setTimeout(()=>boardEl.classList.remove("shake"),250);
+  }
+  else if(combo==5){
+   msg.textContent="💥 EPIC!";
+   msg.style.color="#f97316";
+   
+   
+   
+   
+   boardEl.classList.add("shake");
+   setTimeout(()=>boardEl.classList.remove("shake"),250);
+  }
+  else if(combo==6){
+   msg.textContent="🚀 MASTER!";
+   msg.style.color="#ef4444";
+   
+   
+   
+   
+   
+   boardEl.classList.add("shake");
+   setTimeout(()=>boardEl.classList.remove("shake"),250);
+  }
+  else if(combo>=7){
+   msg.textContent="🌟 GODLIKE!";
+   msg.style.color="#facc15";
+   
+   setTimeout(()=>sound(1700,.08),80);
+   
+   
+   
+   
+   boardEl.classList.add("shake");
+   setTimeout(()=>boardEl.classList.remove("shake"),250);
+  }
+
+  sound(700+combo*100,.1);
+
+  m.forEach(([r,c])=>{
+   let idx=r*SIZE+c;
+   let cell=boardEl.children[idx];
+   if(cell){
+    let rect=cell.getBoundingClientRect();
+    particle(rect.left+20,rect.top+20);
+   }
+   board[r][c]=null;
+  });
+
+  score += m.length*10*combo;
+
+  if(score>high){
+   high=score;
+   localStorage.setItem("m3_v141_high",high);
+  }
+
+  levelScore += m.length*10*combo;updateLevelProgress();
+
+  if(levelScore>=target){
+   clearInterval(timer);
+   document.getElementById('levelInfo').innerHTML=
+   'Level '+level+' Complete!<br><br>'+
+   'Target Score: '+target+' ✔<br>'+
+   'Time Bonus: +30 Seconds<br><br>'+
+   'Next Level Target: '+(level+1)+': '+(target+500);
+   document.getElementById('levelOverlay').style.display='flex';
+   return;
+  }
+
+  for(let c=0;c<SIZE;c++){
+   let arr=[];
+   for(let r=SIZE-1;r>=0;r--) if(board[r][c]!=null) arr.push(board[r][c]);
+   while(arr.length<SIZE) arr.push(rnd());
+   for(let r=SIZE-1,i=0;r>=0;r--,i++) board[r][c]=arr[i];
+  }
+
+  updateHUD();updateLevelProgress();
+  draw();
+  await new Promise(x=>setTimeout(x,800));
+ }
+}
+
+function updateHUD(){
+ scoreEl.textContent=score;
+ highEl.textContent=high;
+ levelEl.textContent=level;
+ timeEl.textContent=time;
+ progress.style.width=Math.min(100,(levelScore/target)*100)+"%";
+}
+
+function endGame(){
+ gameOver=true;
+ clearInterval(timer);
+ time=0;
+ updateHUD();updateLevelProgress();
+ result.innerHTML=`Score: ${score}<br>High Score: ${high}<br>Level: ${level}`;
+ overlay.style.display="flex";
+}
+
+function restart(){
+ overlay.style.display="none";
+ score=0;level=1;time=60;combo=0;target=500;levelScore=0;gameOver=false;
+ build();draw();resolve();updateHUD();updateLevelProgress();
+ clearInterval(timer);startTimer();
+}
+
+function startTimer(){
+ timer=setInterval(()=>{
+  if(gameOver)return;
+  time=Math.max(0,time-1);
+  updateHUD();updateLevelProgress();
+  if(time===0) endGame();
+ },1000);
+}
+
+
+
+function updateLevelProgress(){
+ const el=document.getElementById('levelProgressText');
+ if(el){
+   el.textContent = levelScore + ' / ' + target;
+ }
+}
+
+function continueLevel(){
+ document.getElementById('levelOverlay').style.display='none';
+
+ // Perbaikan bug slot kosong saat naik level
+ for(let c=0;c<SIZE;c++){
+   let arr=[];
+   for(let r=SIZE-1;r>=0;r--){
+      if(board[r][c]!=null) arr.push(board[r][c]);
+   }
+   while(arr.length<SIZE) arr.push(rnd());
+   for(let r=SIZE-1,i=0;r>=0;r--,i++){
+      board[r][c]=arr[i];
+   }
+ }
+
+ draw();
+
+ level++;
+ target+=500;
+ levelScore=0;
+ time+=30;
+ updateHUD();updateLevelProgress();
+ startTimer();
+ sound(1200,.2);
+ msg.textContent='🎉 LEVEL '+level;
+}
+
+const boardEl=document.getElementById("board");
+const particles=document.getElementById("particles");
+const scoreEl=document.getElementById("score");
+const highEl=document.getElementById("high");
+const levelEl=document.getElementById("level");
+const timeEl=document.getElementById("time");
+const comboEl=document.getElementById("combo");
+const progress=document.getElementById("progress");
+const msg=document.getElementById("msg");
+const overlay=document.getElementById("overlay");
+const result=document.getElementById("result");
+
+
+clearInterval(timer);
+function startGame(){
+ document.getElementById('startScreen').style.display='none';
+ build();draw();updateHUD();updateLevelProgress();startTimer();
+}
+
+</script>
+
+<div id="howToPlayModal" style="position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:10000">
+ <div style="background:#1e293b;padding:24px;border-radius:20px;max-width:520px;color:white;text-align:left">
+  <h2 style="text-align:center">🍭 HOW TO PLAY</h2>
+  <ol style="line-height:1.8">
+   <li>Click a candy, then click an adjacent candy to swap them.</li>
+   <li>Match 3 or more identical candies in a horizontal or vertical line.</li>
+   <li>Matched candies will disappear and earn points.</li>
+   <li>New candies will fall to fill empty spaces.</li>
+   <li>Create combo chains to earn more points.</li>
+   <li>Reach the target score to complete the level.</li>
+   <li>Complete levels to gain extra time.</li>
+   <li>The game ends when the timer reaches 0.</li>
+  </ol>
+  <p style="text-align:center;margin-top:15px;font-weight:bold;color:#facc15">
+  Good luck! Reach the highest level and beat your high score! 🚀🏆
+  </p>
+  <div style="text-align:center">
+   <button class="startBtn" onclick="closeHowToPlay()">CLOSE</button>
+  </div>
+ </div>
+</div>
+
+<script>
+function showHowToPlay(){
+ document.getElementById('howToPlayModal').style.display='flex';
+}
+function closeHowToPlay(){
+ document.getElementById('howToPlayModal').style.display='none';
+}
+</script>
+</body>
+</html>
