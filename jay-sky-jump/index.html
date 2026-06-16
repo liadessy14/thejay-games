@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>JAY SKY JUMP</title>
+
+<style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+-webkit-tap-highlight-color:transparent;
+}
+
+html,body{
+width:100%;
+height:100%;
+overflow:hidden;
+font-family:Arial,Helvetica,sans-serif;
+background:#69d2ff;
+}
+
+canvas{
+display:block;
+width:100%;
+height:100%;
+}
+
+.menu,
+.pauseMenu,
+.gameOver{
+position:absolute;
+inset:0;
+display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+background:rgba(0,0,0,.45);
+color:white;
+z-index:10;
+}
+
+.pauseMenu,
+.gameOver{
+display:none;
+}
+
+.title{
+font-size:48px;
+font-weight:900;
+margin-bottom:10px;
+}
+
+.subtitle{
+font-size:18px;
+opacity:.9;
+margin-bottom:25px;
+text-align:center;
+padding:0 20px;
+}
+
+.btn{
+padding:14px 28px;
+font-size:20px;
+font-weight:bold;
+border:none;
+border-radius:14px;
+background:#9c4dff;
+color:white;
+cursor:pointer;
+margin-top:10px;
+}
+
+.btn:active{
+transform:scale(.95);
+}
+
+</style>
+</head>
+
+<body>
+
+<canvas id="game"></canvas>
+
+<div id="menu" class="menu">
+
+<div class="title">JAY SKY JUMP</div>
+
+<div class="subtitle">
+Jump across moving platforms<br>
+Collect coins and survive
+</div>
+
+<button class="btn" id="startBtn">
+START
+</button>
+
+</div>
+
+<div id="pauseMenu" class="pauseMenu">
+
+<h1>PAUSED</h1>
+
+<button class="btn" id="resumeBtn">
+RESUME
+</button>
+
+<button class="btn" id="restartBtn">
+RESTART
+</button>
+
+</div>
+
+<div id="gameOver" class="gameOver">
+
+<h1>GAME OVER</h1>
+
+<h2 id="finalScore">Score: 0</h2>
+
+<h3 id="finalCoins">Coins: 0</h3>
+
+<h3 id="finalBest">Best: 0</h3>
+
+<button class="btn" id="againBtn">
+PLAY AGAIN
+</button>
+
+</div>
+
+<script>
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+function resize(){
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+}
+
+resize();
+addEventListener("resize",resize);
+
+const menu = document.getElementById("menu");
+const pauseMenu = document.getElementById("pauseMenu");
+const gameOverScreen = document.getElementById("gameOver");
+
+let gameRunning = false;
+let paused = false;
+
+let score = 0;
+let coinsCollected = 0;
+
+let bestScore =
+parseInt(localStorage.getItem("jay_best") || "0");
+
+let totalCoins =
+parseInt(localStorage.getItem("jay_total_coins") || "0");
+
+const gravity = 0.75;
+
+let speed = 4;
+
+let jumpCount = 0;
+
+let worldStarted = false;
+
+const player = {
+
+x:180,
+y:0,
+
+radius:28,
+
+vx:0,
+vy:0,
+
+onGround:false,
+
+rotation:0
+
+};
+
+let platforms = [];
+let coins = [];
+let clouds = [];
+
+function saveData(){
+
+localStorage.setItem(
+"jay_best",
+bestScore
+);
+
+localStorage.setItem(
+"jay_total_coins",
+totalCoins
+);
+
+}
+
+function createClouds(){
+
+clouds=[];
+
+for(let i=0;i<6;i++){
+
+clouds.push({
+
+x:Math.random()*canvas.width,
+y:50+Math.random()*220,
+size:50+Math.random()*50,
+speed:.2+Math.random()*.4
+
+});
+
+}
+
+}
+
+createClouds();
+
+function createWorld(){
+
+platforms=[];
+coins=[];
+
+const firstPlatform={
+
+x:80,
+y:canvas.height-170,
+w:340,
+h:24
+
+};
+
+platforms.push(firstPlatform);
+
+let px=520;
+
+for(let i=0;i<15;i++){
+
+const platform={
+
+x:px,
+y:canvas.height-150-Math.random()*220,
+w:110+Math.random()*80,
+h:24
+
+};
+
+platforms.push(platform);
+
+coins.push({
+
+x:platform.x+platform.w/2,
+y:platform.y-40,
+r:12,
+spin:0
+
+});
+
+px+=180+Math.random()*140;
+
+}
+
+player.x=220;
+player.y=firstPlatform.y-170;
+player.vy=0;
+player.onGround=false;
+jumpCount=0;
+worldStarted=false;
+
+score=0;
+coinsCollected=0;
+
+speed=4;
+
+}
+
+function startGame(){
+
+menu.style.display="none";
+pauseMenu.style.display="none";
+gameOverScreen.style.display="none";
+
+createWorld();
+
+gameRunning=true;
+paused=false;
+
+requestAnimationFrame(loop);
+
+}
+
+document.getElementById("startBtn")
+.onclick=startGame;
+
+document.getElementById("againBtn")
+.onclick=startGame;
+
+document.getElementById("restartBtn")
+.onclick=startGame;
+
+document.getElementById("resumeBtn")
+.onclick=()=>{
+
+paused=false;
+pauseMenu.style.display="none";
+
+requestAnimationFrame(loop);
+
+};
+
+const audioCtx =
+new (window.AudioContext || window.webkitAudioContext)();
+
+function soundJump(){
+
+const osc=audioCtx.createOscillator();
+const gain=audioCtx.createGain();
+
+osc.connect(gain);
+gain.connect(audioCtx.destination);
+
+osc.frequency.value=650;
+
+gain.gain.setValueAtTime(
+0.08,
+audioCtx.currentTime
+);
+
+gain.gain.exponentialRampToValueAtTime(
+0.0001,
+audioCtx.currentTime+0.12
+);
+
+osc.start();
+osc.stop(audioCtx.currentTime+0.12);
+
+}
+
+function soundCoin(){
+
+const osc=audioCtx.createOscillator();
+const gain=audioCtx.createGain();
+
+osc.connect(gain);
+gain.connect(audioCtx.destination);
+
+osc.frequency.setValueAtTime(
+800,
+audioCtx.currentTime
+);
+
+osc.frequency.linearRampToValueAtTime(
+1200,
+audioCtx.currentTime+0.1
+);
+
+gain.gain.setValueAtTime(
+0.08,
+audioCtx.currentTime
+);
+
+gain.gain.exponentialRampToValueAtTime(
+0.0001,
+audioCtx.currentTime+0.1
+);
+
+osc.start();
+osc.stop(audioCtx.currentTime+0.1);
+
+}
+
+function soundGameOver(){
+
+const osc=audioCtx.createOscillator();
+const gain=audioCtx.createGain();
+
+osc.connect(gain);
+gain.connect(audioCtx.destination);
+
+osc.frequency.setValueAtTime(
+250,
+audioCtx.currentTime
+);
+
+osc.frequency.linearRampToValueAtTime(
+80,
+audioCtx.currentTime+0.6
+);
+
+gain.gain.setValueAtTime(
+0.12,
+audioCtx.currentTime
+);
+
+gain.gain.exponentialRampToValueAtTime(
+0.0001,
+audioCtx.currentTime+0.6
+);
+
+osc.start();
+osc.stop(audioCtx.currentTime+0.6);
+
+}
+function jump(){
+
+if(!worldStarted) return;
+
+if(jumpCount < 2){
+
+soundJump();
+
+player.vy = -15;
+player.onGround = false;
+
+jumpCount++;
+
+}
+
+}
+
+window.addEventListener("keydown",e=>{
+
+if(e.code==="Space"){
+jump();
+}
+
+if(e.code==="Escape"){
+
+if(!gameRunning) return;
+
+paused=!paused;
+
+if(paused){
+
+pauseMenu.style.display="flex";
+
+}else{
+
+pauseMenu.style.display="none";
+requestAnimationFrame(loop);
+
+}
+
+}
+
+});
+
+canvas.addEventListener("touchstart",jump);
+canvas.addEventListener("mousedown",jump);
+
+function updatePlayer(){
+
+player.vy+=gravity;
+player.y+=player.vy;
+
+player.rotation+=0.08;
+
+player.onGround=false;
+
+for(const p of platforms){
+
+if(worldStarted){
+p.x-=speed;
+}
+
+if(
+player.x+player.radius>p.x &&
+player.x-player.radius<p.x+p.w &&
+player.y+player.radius>p.y &&
+player.y+player.radius<p.y+20 &&
+player.vy>=0
+){
+
+player.y=p.y-player.radius;
+player.vy=0;
+player.onGround=true;
+jumpCount=0;
+
+if(!worldStarted){
+worldStarted=true;
+}
+
+}
+
+}
+
+}
+function updateCoins(){
+
+for(let i=coins.length-1;i>=0;i--){
+
+const c=coins[i];
+
+if(worldStarted){
+c.x-=speed;
+}
+
+c.spin+=0.15;
+
+const dx=player.x-c.x;
+const dy=player.y-c.y;
+
+const dist=Math.hypot(dx,dy);
+
+if(dist<player.radius+c.r){
+
+soundCoin();
+
+coinsCollected++;
+totalCoins++;
+
+score+=10;
+
+coins.splice(i,1);
+
+saveData();
+
+}
+
+}
+
+}
+function updatePlatforms(){
+
+if(!worldStarted) return;
+
+speed=4+(score/600);
+
+if(
+platforms.length &&
+platforms[0].x+platforms[0].w<0
+){
+
+platforms.shift();
+
+score+=0;
+
+const last=
+platforms[platforms.length-1];
+
+const newPlatform={
+
+x:last.x+180+Math.random()*140,
+
+y:canvas.height-140-
+Math.random()*240,
+
+w:110+Math.random()*90,
+
+h:24
+
+};
+
+platforms.push(newPlatform);
+
+if(Math.random()<0.9){
+
+coins.push({
+
+x:newPlatform.x+
+newPlatform.w/2,
+
+y:newPlatform.y-40,
+
+r:12,
+
+spin:0
+
+});
+
+}
+
+}
+
+}
+function gameOver(){
+
+gameRunning=false;
+
+soundGameOver();
+
+if(score>bestScore){
+
+bestScore=score;
+
+saveData();
+
+}
+
+document.getElementById(
+"finalScore"
+).innerText=
+"Score: "+score;
+
+document.getElementById(
+"finalCoins"
+).innerText=
+"Coins: "+coinsCollected;
+
+document.getElementById(
+"finalBest"
+).innerText=
+"Best: "+bestScore;
+
+gameOverScreen.style.display="flex";
+
+}
+
+function update(){
+
+updatePlayer();
+
+updateCoins();
+
+updatePlatforms();
+
+if(
+player.y >
+canvas.height+150
+){
+gameOver();
+}
+
+}
+function drawBackground(){
+
+ctx.fillStyle="#69d2ff";
+ctx.fillRect(
+0,
+0,
+canvas.width,
+canvas.height
+);
+
+for(const c of clouds){
+
+c.x-=c.speed;
+
+if(c.x<-150){
+c.x=canvas.width+100;
+}
+
+ctx.fillStyle=
+"rgba(255,255,255,.85)";
+
+ctx.beginPath();
+ctx.arc(c.x,c.y,c.size*.4,0,Math.PI*2);
+ctx.arc(c.x+35,c.y,c.size*.5,0,Math.PI*2);
+ctx.arc(c.x+75,c.y,c.size*.4,0,Math.PI*2);
+ctx.fill();
+
+}
+
+}
+function drawPlatforms(){
+
+for(const p of platforms){
+
+ctx.fillStyle="#ffd633";
+
+ctx.beginPath();
+
+ctx.roundRect(
+p.x,
+p.y,
+p.w,
+p.h,
+20
+);
+
+ctx.fill();
+
+ctx.strokeStyle="#dca800";
+ctx.lineWidth=3;
+ctx.stroke();
+
+}
+
+}
+function drawCoins(){
+
+for(const c of coins){
+
+ctx.save();
+
+ctx.translate(
+c.x,
+c.y
+);
+
+const scale=
+Math.abs(
+Math.cos(c.spin)
+);
+
+ctx.scale(scale,1);
+
+ctx.fillStyle="gold";
+
+ctx.beginPath();
+
+ctx.arc(
+0,
+0,
+c.r,
+0,
+Math.PI*2
+);
+
+ctx.fill();
+
+ctx.strokeStyle="#ffb300";
+ctx.lineWidth=3;
+ctx.stroke();
+
+ctx.restore();
+
+}
+
+}
+function drawPlayer(){
+
+ctx.save();
+
+ctx.translate(
+player.x,
+player.y
+);
+
+if(!player.onGround){
+
+ctx.rotate(
+player.rotation
+);
+
+}
+
+// badan kodok ungu bright
+ctx.fillStyle="#b14dff";
+ctx.beginPath();
+ctx.arc(0,0,player.radius,0,Math.PI*2);
+ctx.fill();
+
+// mata kiri
+ctx.fillStyle="#b14dff";
+ctx.beginPath();
+ctx.arc(-12,-18,8,0,Math.PI*2);
+ctx.fill();
+
+// mata kanan
+ctx.beginPath();
+ctx.arc(12,-18,8,0,Math.PI*2);
+ctx.fill();
+
+// bola mata putih
+ctx.fillStyle="white";
+ctx.beginPath();
+ctx.arc(-12,-18,4,0,Math.PI*2);
+ctx.arc(12,-18,4,0,Math.PI*2);
+ctx.fill();
+
+// pupil
+ctx.fillStyle="black";
+ctx.beginPath();
+ctx.arc(-12,-18,2,0,Math.PI*2);
+ctx.arc(12,-18,2,0,Math.PI*2);
+ctx.fill();
+
+// hidung
+ctx.fillStyle="#8a2be2";
+ctx.beginPath();
+ctx.arc(-4,2,2,0,Math.PI*2);
+ctx.arc(4,2,2,0,Math.PI*2);
+ctx.fill();
+
+// mulut
+ctx.strokeStyle="black";
+ctx.lineWidth=2;
+ctx.beginPath();
+ctx.arc(0,8,10,0,Math.PI,false);
+ctx.stroke();
+
+// gigi kelinci
+ctx.fillStyle="white";
+ctx.fillRect(-5,8,4,8);
+ctx.fillRect(1,8,4,8);
+
+// pipi
+ctx.fillStyle="#d98cff";
+ctx.beginPath();
+ctx.arc(-15,8,4,0,Math.PI*2);
+ctx.arc(15,8,4,0,Math.PI*2);
+ctx.fill();
+ctx.restore();
+
+}
+function drawUI(){
+
+ctx.fillStyle="white";
+
+ctx.font="bold 24px Arial";
+ctx.textAlign="left";
+
+ctx.fillText(
+"Score: "+score,
+20,
+40
+);
+
+ctx.fillText(
+"Coins: "+coinsCollected,
+20,
+75
+);
+
+ctx.fillText(
+"Best: "+bestScore,
+20,
+110
+);
+
+ctx.fillStyle=
+"rgba(255,255,255,.25)";
+
+ctx.fillRect(
+canvas.width-80,
+20,
+50,
+50
+);
+
+ctx.fillStyle="white";
+
+ctx.fillRect(
+canvas.width-63,
+30,
+8,
+30
+);
+
+ctx.fillRect(
+canvas.width-45,
+30,
+8,
+30
+);
+
+}
+canvas.addEventListener("click",e=>{
+
+if(!gameRunning) return;
+
+const rect=
+canvas.getBoundingClientRect();
+
+const mx=
+e.clientX-rect.left;
+
+const my=
+e.clientY-rect.top;
+
+if(
+mx>canvas.width-80 &&
+mx<canvas.width-30 &&
+my>20 &&
+my<70
+){
+
+paused=true;
+
+pauseMenu.style.display="flex";
+
+}
+
+});
+function loop(){
+
+if(!gameRunning) return;
+
+if(paused) return;
+
+update();
+
+drawBackground();
+
+drawPlatforms();
+
+drawCoins();
+
+drawPlayer();
+
+drawUI();
+
+requestAnimationFrame(loop);
+
+}
+</script>
+
+</body>
+</html>
