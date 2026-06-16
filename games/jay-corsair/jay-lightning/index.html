@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>Jay Lightning Catch</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}html,body{width:100%;height:100%;overflow:hidden;background:#080014;font-family:Arial,Helvetica,sans-serif;touch-action:none;user-select:none}canvas{display:block;width:100vw;height:100vh;background:#080014}#menu{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(8,0,25,.78);z-index:10}.card{width:min(92vw,480px);padding:24px;border-radius:24px;text-align:center;color:white;background:linear-gradient(180deg,#3a0079,#11002d);border:2px solid #b84cff;box-shadow:0 0 38px rgba(184,76,255,.45)}h1{font-size:42px;margin-bottom:12px;text-shadow:0 0 22px #b84cff}p{color:#dfcaff;line-height:1.5;margin:12px 0 20px}button{border:0;border-radius:999px;padding:14px 28px;font-weight:900;font-size:16px;color:#230038;background:linear-gradient(90deg,#ffd83d,#b84cff,#45e9ff)}#hint{position:fixed;left:50%;bottom:15px;transform:translateX(-50%);color:#ead8ff;background:rgba(35,0,75,.6);border:1px solid rgba(184,76,255,.65);border-radius:999px;padding:9px 14px;font-size:12px;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="menu"><div class="card"><h1>⚡ JAY LIGHTNING</h1><p>Move the JAY catcher left and right. Catch lightning bolts for 50 points and avoid red viruses.</p><button id="start">START GAME</button></div></div>
+<div id="hint">MOVE FINGER TO CATCH LIGHTNING</div>
+<script>
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),menu=document.getElementById('menu'),startBtn=document.getElementById('start');
+let w,h,run=false,frame=0,score=0,lives=3,best=Number(localStorage.getItem('jay_lightning_best')||0),stars=[],items=[],parts=[],player={x:0,y:0,w:92,h:42};
+function rand(a,b){return Math.random()*(b-a)+a}
+function resize(){w=innerWidth;h=innerHeight;canvas.width=w;canvas.height=h;player.x=w/2-player.w/2;player.y=h-88;makeStars()}addEventListener('resize',resize);
+function makeStars(){stars=[];for(let i=0;i<110;i++)stars.push({x:rand(0,w),y:rand(0,h),r:rand(.5,2),s:rand(.1,.55),a:rand(.25,1)})}
+function reset(){run=true;frame=0;score=0;lives=3;items=[];parts=[];player.x=w/2-player.w/2;menu.style.display='none'}startBtn.onclick=reset;
+addEventListener('pointermove',e=>{player.x=e.clientX-player.w/2});addEventListener('pointerdown',e=>{if(e.target!==startBtn)player.x=e.clientX-player.w/2});addEventListener('keydown',e=>{if(e.key==='ArrowLeft')player.x-=35;if(e.key==='ArrowRight')player.x+=35});
+function spawnItem(){const type=Math.random()<.78?'lightning':'virus';items.push({x:rand(35,w-35),y:-40,r:type==='lightning'?20:18,type,vy:type==='lightning'?rand(3.2,5.2)+score/900:rand(3.8,5.8)+score/1000,rot:rand(0,Math.PI*2)})}
+function burst(x,y,color,n){for(let i=0;i<n;i++)parts.push({x,y,vx:rand(-3.5,3.5),vy:rand(-4,2.5),r:rand(2,5),life:rand(18,36),color})}
+function hitItem(it){return it.x>player.x-8&&it.x<player.x+player.w+8&&it.y+it.r>player.y&&it.y-it.r<player.y+player.h}
+function drawBg(){const g=ctx.createRadialGradient(w/2,h/2,20,w/2,h/2,Math.max(w,h));g.addColorStop(0,'#350078');g.addColorStop(.5,'#17003e');g.addColorStop(1,'#05000f');ctx.fillStyle=g;ctx.fillRect(0,0,w,h);stars.forEach(s=>{s.y+=s.s;if(s.y>h)s.y=0;ctx.globalAlpha=s.a+Math.sin(frame*.04+s.x)*.18;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1});ctx.strokeStyle='rgba(184,76,255,.13)';ctx.lineWidth=2;for(let i=0;i<6;i++){const y=(i*150+frame*.28)%(h+180)-90;ctx.beginPath();ctx.moveTo(-80,y);ctx.lineTo(w+80,y+200);ctx.stroke()}}
+function round(x,y,ww,hh,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+ww-r,y);ctx.quadraticCurveTo(x+ww,y,x+ww,y+r);ctx.lineTo(x+ww,y+hh-r);ctx.quadraticCurveTo(x+ww,y+hh,x+ww-r,y+hh);ctx.lineTo(x+r,y+hh);ctx.quadraticCurveTo(x,y+hh,x,y+hh-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y)}
+function drawPlayer(){player.x=Math.max(10,Math.min(w-player.w-10,player.x));ctx.save();ctx.shadowColor='#45e9ff';ctx.shadowBlur=22;ctx.fillStyle='#45e9ff';round(player.x,player.y,player.w,player.h,18);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#140033';round(player.x+8,player.y+7,player.w-16,player.h-14,14);ctx.fill();ctx.fillStyle='#fff';ctx.font='900 25px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('JAY',player.x+player.w/2,player.y+player.h/2+1);ctx.restore()}
+function drawLightning(it){ctx.save();ctx.translate(it.x,it.y);ctx.rotate(Math.sin(frame*.1+it.x)*.08);ctx.shadowColor='#ffd83d';ctx.shadowBlur=22;ctx.fillStyle='#ffd83d';ctx.beginPath();ctx.moveTo(-5,-28);ctx.lineTo(14,-6);ctx.lineTo(4,-6);ctx.lineTo(11,27);ctx.lineTo(-15,1);ctx.lineTo(-4,1);ctx.closePath();ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle='#fff4a5';ctx.lineWidth=2;ctx.stroke();ctx.restore()}
+function drawVirus(it){ctx.save();ctx.translate(it.x,it.y);ctx.rotate(it.rot);it.rot+=.04;ctx.shadowColor='#ff3d77';ctx.shadowBlur=18;ctx.fillStyle='#ff3d77';ctx.beginPath();for(let i=0;i<12;i++){const a=i*Math.PI*2/12,rr=it.r+(i%2?5:-3);ctx.lineTo(Math.cos(a)*rr,Math.sin(a)*rr)}ctx.closePath();ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(-6,-4,3,0,Math.PI*2);ctx.arc(7,-4,3,0,Math.PI*2);ctx.fill();ctx.restore()}
+function drawHud(){ctx.save();ctx.fillStyle='#fff';ctx.shadowColor='#b84cff';ctx.shadowBlur=12;ctx.font='900 25px Arial';ctx.textAlign='left';ctx.fillText('SCORE '+score,22,42);ctx.fillStyle='#ffd83d';ctx.fillText('+50 / ⚡',22,74);ctx.textAlign='right';ctx.fillStyle='#45e9ff';ctx.fillText('BEST '+best,w-22,42);ctx.fillStyle='#ff6aa2';ctx.fillText('❤ '+lives,w-22,74);ctx.restore()}
+function drawParts(){parts.forEach(p=>{ctx.globalAlpha=Math.max(0,p.life/36);ctx.fillStyle=p.color;ctx.shadowColor=p.color;ctx.shadowBlur=10;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;ctx.shadowBlur=0})}
+function update(){frame++;const spawnRate=Math.max(22,56-Math.floor(score/250));if(frame%spawnRate===0)spawnItem();items.forEach(it=>it.y+=it.vy);items=items.filter(it=>{if(hitItem(it)){if(it.type==='lightning'){score+=50;if(score>best){best=score;localStorage.setItem('jay_lightning_best',best)}burst(it.x,it.y,'#ffd83d',22)}else{lives--;burst(it.x,it.y,'#ff3d77',25);if(lives<=0)gameOver()}return false}if(it.y>h+50){if(it.type==='lightning'){lives--;if(lives<=0)gameOver()}return false}return true});parts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vx*=.97;p.vy*=.97;p.life--});parts=parts.filter(p=>p.life>0)}
+function gameOver(){run=false;menu.style.display='flex';menu.innerHTML='<div class="card"><h1>GAME OVER</h1><p>Score: <b>'+score+'</b><br>Best: <b>'+best+'</b></p><button onclick="location.reload()">PLAY AGAIN</button></div>'}
+function loop(){drawBg();drawPlayer();items.forEach(it=>it.type==='lightning'?drawLightning(it):drawVirus(it));drawParts();drawHud();if(run)update();else frame++;requestAnimationFrame(loop)}
+resize();loop();
+</script>
+</body>
+</html>
