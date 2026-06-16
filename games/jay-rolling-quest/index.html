@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>JAY ROLLING QUEST</title>
+
+<style>
+:root{
+--purple:#A020F0;
+--white:#FFFFFF;
+--gold:#FFD700;
+--rock:#808080;
+--green:#22C55E;
+}
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Arial,Helvetica,sans-serif;
+}
+
+body{
+overflow:hidden;
+background:#111;
+touch-action:manipulation;
+}
+
+canvas{
+display:block;
+width:100vw;
+height:100vh;
+}
+
+.screen{
+position:absolute;
+inset:0;
+display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+text-align:center;
+padding:20px;
+transition:.4s;
+}
+
+#startScreen{
+background:var(--green);
+color:white;
+z-index:10;
+animation:fadeIn .7s ease;
+}
+
+#startScreen h1{
+font-size:clamp(40px,7vw,80px);
+color:var(--purple);
+margin-bottom:15px;
+text-shadow:0 0 20px rgba(160,32,240,.8);
+}
+
+#startScreen p{
+max-width:700px;
+line-height:1.6;
+margin-bottom:20px;
+}
+
+.btn{
+border:none;
+padding:16px 35px;
+font-size:20px;
+font-weight:bold;
+border-radius:16px;
+cursor:pointer;
+background:white;
+color:var(--purple);
+transition:.2s;
+}
+
+.btn:hover{
+transform:scale(1.05);
+}
+
+#gameOver{
+background:rgba(0,0,0,.65);
+color:white;
+display:none;
+z-index:20;
+animation:fadeIn .5s ease;
+}
+
+#gameOver h1{
+font-size:60px;
+margin-bottom:20px;
+color:white;
+}
+
+.gameBtns{
+display:flex;
+gap:12px;
+flex-wrap:wrap;
+justify-content:center;
+margin-top:20px;
+}
+
+@keyframes fadeIn{
+from{opacity:0}
+to{opacity:1}
+}
+
+.hud{
+position:absolute;
+top:15px;
+left:15px;
+right:15px;
+display:flex;
+justify-content:space-between;
+font-weight:bold;
+font-size:24px;
+color:white;
+pointer-events:none;
+z-index:5;
+text-shadow:0 0 10px var(--purple);
+}
+
+.instructions{
+font-size:18px;
+margin:20px 0;
+}
+#gameFrame{
+position:absolute;
+left:50%;
+top:50%;
+transform:translate(-50%,-50%);
+
+width:min(1200px,95vw);
+height:min(650px,85vh);
+
+border:4px solid #A020F0;
+border-radius:24px;
+
+overflow:hidden;
+
+box-shadow:
+0 0 20px rgba(160,32,240,.6),
+0 0 50px rgba(160,32,240,.3);
+
+background:#111;
+}
+
+
+
+#frameBar{
+height:50px;
+background:#1a1a1a;
+border-bottom:2px solid #A020F0;
+
+display:flex;
+align-items:center;
+padding:0 16px;
+gap:12px;
+}
+
+.frameTitle{
+color:white;
+font-weight:bold;
+letter-spacing:1px;
+}
+
+.dots{
+display:flex;
+gap:8px;
+}
+
+.dots span{
+width:12px;
+height:12px;
+border-radius:50%;
+background:#A020F0;
+box-shadow:0 0 8px #A020F0;
+}
+
+#game{
+display:block;
+width:100%;
+height:calc(100% - 50px);
+background:linear-gradient(
+to bottom,
+#f8f8ff,
+#e9dcff
+);
+}
+
+@media (max-width:768px) and (orientation:landscape){
+
+#gameFrame{
+width:98vw;
+height:95dvh;
+}
+
+}
+
+</style>
+</head>
+<body>
+
+<div class="hud">
+<div id="scoreText">Score: 0</div>
+<div id="bestText">Best: 0</div>
+</div>
+
+<div id="startScreen" class="screen">
+<h1>JAY ROLLING QUEST</h1>
+
+<p>
+Roll across floating platforms, collect Jay Coins, and survive as long as possible.
+</p>
+
+<div class="instructions">
+Tap Screen / Click Mouse / Press Space to Jump<br>
+Collect Jay Coins<br>
+Avoid Rocks<br>
+Don't Fall Off The Platforms<br>
+Earn the Highest Score
+</div>
+
+<button class="btn" id="startBtn">
+START GAME
+</button>
+</div>
+
+<div id="gameOver" class="screen">
+<h1>GAME OVER</h1>
+
+<h2 id="finalScore">Score: 0</h2>
+<h3 id="finalBest">Best: 0</h3>
+
+<div class="gameBtns">
+<button class="btn" id="againBtn">PLAY AGAIN</button>
+<button class="btn" id="menuBtn">MAIN MENU</button>
+</div>
+</div>
+
+<div id="gameFrame">
+    <div id="frameBar">
+        <div class="dots">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+        <div class="frameTitle">JAY ROLLING QUEST</div>
+    </div>
+
+    <canvas id="game"></canvas>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+function resize(){
+
+const rect = canvas.getBoundingClientRect();
+
+canvas.width = rect.width;
+canvas.height = rect.height;
+
+}
+resize();
+window.addEventListener("resize",resize);
+
+const PURPLE="#A020F0";
+const GOLD="#FFD700";
+
+let best=Number(localStorage.getItem("jayBest"))||0;
+document.getElementById("bestText").textContent="Best: "+best;
+
+let gameRunning=false;
+
+const gravity=0.8;
+
+let cameraX=0;
+let score=0;
+
+const player={
+x:120,
+y:0,
+vx:4,
+vy:0,
+r:26,
+rot:0,
+ground:false,
+bounce:1,
+jumps:2
+};
+
+const platforms=[];
+const coins=[];
+const rocks=[];
+const particles=[];
+
+function buildLevel(){
+
+platforms.length=0;
+coins.length=0;
+rocks.length=0;
+
+let x=0;
+
+const baseY = canvas.height * 0.75;
+
+for(let i=0;i<100;i++){
+
+let w=180;
+let platformY = baseY - (i%3)*60;
+
+platforms.push({
+x:x,
+y:platformY,
+w:w,
+h:20
+});
+
+coins.push({
+x:x+w/2,
+y:platformY-45,
+r:12,
+rot:0,
+taken:false
+});
+
+if(i>2 && i%4===0){
+rocks.push({
+x:x+w*0.7,
+y:platformY-15,
+r:18
+});
+}
+
+x+=240;
+}
+}
+
+function resetGame(){
+
+score=0;
+cameraX=0;
+
+resize();
+player.x=120;
+player.y = canvas.height * 0.55;
+player.vx=4;
+player.vy=0;
+player.rot=0;
+
+player.jumps = 2; // reset double jump
+
+buildLevel();
+
+updateHud();
+
+document.getElementById("gameOver").style.display="none";
+
+gameRunning=true;
+}
+
+function updateHud(){
+document.getElementById("scoreText").textContent="Score: "+score;
+document.getElementById("bestText").textContent="Best: "+best;
+}
+
+function saveBest(){
+if(score>best){
+best=score;
+localStorage.setItem("jayBest",best);
+}
+updateHud();
+}
+
+function jump(){
+
+if(!gameRunning) return;
+
+if(player.jumps === 2){
+player.vy = -14; // lompat pertama
+player.jumps--;
+playJump();
+}
+else if(player.jumps === 1){
+player.vy = -12; // lompat kedua sedikit lebih rendah
+player.jumps--;
+playJump();
+}
+
+player.ground = false;
+}
+
+function gameOver(){
+
+if(!gameRunning) return;
+
+gameRunning=false;
+
+saveBest();
+
+playLose();
+
+document.getElementById("finalScore").textContent=
+"Score: "+score;
+
+document.getElementById("finalBest").textContent=
+"Best: "+best;
+
+document.getElementById("gameOver").style.display="flex";
+}
+
+function collectCoin(c){
+
+c.taken=true;
+
+score+=20;
+
+if(score>best){
+best=score;
+localStorage.setItem("jayBest",best);
+}
+
+updateHud();
+
+playCoin();
+
+for(let i=0;i<12;i++){
+particles.push({
+x:c.x,
+y:c.y,
+vx:(Math.random()-0.5)*5,
+vy:(Math.random()-0.5)*5,
+life:30
+});
+}
+}
+
+function update(){
+
+if(!gameRunning) return;
+
+player.vy+=gravity;
+
+player.x+=player.vx;
+player.y+=player.vy;
+
+player.rot+=0.12;
+
+player.ground=false;
+
+for(const p of platforms){
+
+if(
+player.x+player.r>p.x &&
+player.x-player.r<p.x+p.w &&
+player.y+player.r>p.y &&
+player.y+player.r<p.y+p.h &&
+player.vy>=0
+){
+player.y=p.y-player.r;
+player.vy=0;
+player.ground=true;
+player.bounce=1.08;
+player.jumps = 2;
+}
+}
+
+player.bounce += (1-player.bounce)*0.2;
+
+for(const c of coins){
+
+c.rot+=0.12;
+
+if(c.taken) continue;
+
+const dx=player.x-c.x;
+const dy=player.y-c.y;
+
+if(Math.hypot(dx,dy)<player.r+c.r){
+collectCoin(c);
+}
+}
+
+for(const r of rocks){
+
+const dx=player.x-r.x;
+const dy=player.y-r.y;
+
+if(Math.hypot(dx,dy)<player.r+r.r-4){
+gameOver();
+}
+}
+
+for(let i=particles.length-1;i>=0;i--){
+
+const p=particles[i];
+
+p.x+=p.vx;
+p.y+=p.vy;
+p.life--;
+
+if(p.life<=0){
+particles.splice(i,1);
+}
+}
+
+cameraX=player.x-150;
+
+if(player.y>canvas.height+200){
+gameOver();
+}
+}
+
+function draw(){
+
+ctx.clearRect(0,0,canvas.width,canvas.height);
+
+ctx.save();
+ctx.translate(-cameraX,0);
+
+for(const p of platforms){
+
+ctx.fillStyle="white";
+ctx.fillRect(p.x,p.y,p.w,p.h);
+
+ctx.strokeStyle=PURPLE;
+ctx.lineWidth=4;
+ctx.strokeRect(p.x,p.y,p.w,p.h);
+}
+
+for(const c of coins){
+
+if(c.taken) continue;
+
+ctx.save();
+
+ctx.translate(c.x,c.y);
+ctx.rotate(c.rot);
+
+ctx.shadowBlur=15;
+ctx.shadowColor=GOLD;
+
+ctx.fillStyle=GOLD;
+ctx.beginPath();
+ctx.ellipse(0,0,12,16,0,0,Math.PI*2);
+ctx.fill();
+
+ctx.restore();
+}
+
+for(const r of rocks){
+
+ctx.fillStyle="#808080";
+
+ctx.beginPath();
+ctx.arc(r.x,r.y,r.r,0,Math.PI*2);
+ctx.fill();
+}
+
+for(const p of particles){
+
+ctx.fillStyle=GOLD;
+
+ctx.beginPath();
+ctx.arc(p.x,p.y,3,0,Math.PI*2);
+ctx.fill();
+}
+
+ctx.save();
+
+ctx.translate(player.x,player.y);
+
+ctx.fillStyle="rgba(0,0,0,.25)";
+ctx.beginPath();
+ctx.ellipse(
+0,
+player.r+12,
+player.r*0.9,
+10,
+0,0,Math.PI*2
+);
+ctx.fill();
+
+ctx.rotate(player.rot);
+
+ctx.scale(1,player.bounce);
+
+ctx.shadowBlur=25;
+ctx.shadowColor=PURPLE;
+
+ctx.fillStyle=PURPLE;
+ctx.beginPath();
+ctx.arc(0,0,player.r,0,Math.PI*2);
+ctx.fill();
+
+ctx.fillStyle="white";
+ctx.font="bold 28px Arial";
+ctx.textAlign="center";
+ctx.textBaseline="middle";
+ctx.fillText("J",0,1);
+
+ctx.restore();
+
+ctx.restore();
+}
+
+function loop(){
+update();
+draw();
+requestAnimationFrame(loop);
+}
+loop();
+
+let audioCtx;
+
+function getAudio(){
+if(!audioCtx){
+audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+}
+return audioCtx;
+}
+
+function beep(freq,duration,type="sine",vol=0.08){
+
+const a=getAudio();
+
+const osc=a.createOscillator();
+const gain=a.createGain();
+
+osc.type=type;
+osc.frequency.value=freq;
+
+gain.gain.value=vol;
+
+osc.connect(gain);
+gain.connect(a.destination);
+
+osc.start();
+
+gain.gain.exponentialRampToValueAtTime(
+0.0001,
+a.currentTime+duration
+);
+
+osc.stop(a.currentTime+duration);
+}
+
+function playClick(){
+beep(600,.08,"square");
+}
+
+function playJump(){
+beep(220,.12,"triangle");
+setTimeout(()=>beep(330,.08,"triangle"),50);
+}
+
+function playCoin(){
+beep(900,.1,"sine");
+setTimeout(()=>beep(1200,.1,"sine"),30);
+}
+
+function playLose(){
+beep(180,.35,"sawtooth");
+}
+
+document.getElementById("startBtn").onclick=()=>{
+playClick();
+document.getElementById("startScreen").style.display="none";
+
+setTimeout(()=>{
+resetGame();
+},50);
+};
+
+document.getElementById("againBtn").onclick=()=>{
+playClick();
+resetGame();
+};
+
+document.getElementById("menuBtn").onclick=()=>{
+playClick();
+document.getElementById("gameOver").style.display="none";
+document.getElementById("startScreen").style.display="flex";
+};
+
+window.addEventListener("keydown",(e)=>{
+if(e.code==="Space"){
+e.preventDefault();
+jump();
+}
+});
+
+window.addEventListener("mousedown",jump);
+window.addEventListener("touchstart",jump,{passive:true});
+</script>
+
+</body>
+</html>
